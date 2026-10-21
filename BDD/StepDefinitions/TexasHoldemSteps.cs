@@ -169,7 +169,6 @@ namespace TexasHoldem.BDD.StepDefinitions
         {
             _game = await _client.GetGameAsync(new Game { Id = _game!.Id });
             _round = await _client.CreateRoundFromGameAsync(_game);
-            _round = await _client.ValidatePreRoundAsync(_round);
             if (!string.IsNullOrEmpty(_testDeck))
             {
                 _round.TESTD = _testDeck;
@@ -356,7 +355,6 @@ namespace TexasHoldem.BDD.StepDefinitions
             }
             _game = await _client.GetGameAsync(new Game { Id = _game.Id });
             _round = await _client.CreateRoundFromGameAsync(_game);
-            _round = await _client.ValidatePreRoundAsync(_round);
             if (!string.IsNullOrEmpty(_testDeck))
             {
                 _round.TESTD = _testDeck;

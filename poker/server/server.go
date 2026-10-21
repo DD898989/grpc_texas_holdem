@@ -592,32 +592,6 @@ func (s *Server) CreateRoundPlayers(ctx context.Context, r *models.Round) (*mode
 	return round, nil
 }
 
-func (s *Server) ValidatePreRound(ctx context.Context, r *models.Round) (*models.Round, error) {
-	round, err := s.GetRound(ctx, r)
-	if err != nil {
-		return nil, err
-	}
-
-	game, err := s.GetGame(ctx, &models.Game{ID: r.Game})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(r.GetPlayers()) != len(game.GetPlayers()) {
-		return nil, ErrInvalidPlayerCount
-	}
-
-	for _, p := range r.GetPlayers() {
-		if p.Chips < game.GetMin()*2 {
-			return nil, ErrInsufficientChips
-		}
-	}
-
-	d := deck.Deck{}
-	d = d.Marshal(r.GetDeck())
-	return round, nil
-}
-
 func (s *Server) StartRound(ctx context.Context, r *models.Round) (*models.Round, error) {
 	r, err := s.CreateDeck(ctx, r)
 	if err != nil {
@@ -1425,9 +1399,6 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	})
 	registerHandler(mux, "GetRound", func(ctx context.Context, in *models.Round) (interface{}, error) {
 		return s.GetRound(ctx, in)
-	})
-	registerHandler(mux, "ValidatePreRound", func(ctx context.Context, in *models.Round) (interface{}, error) {
-		return s.ValidatePreRound(ctx, in)
 	})
 	registerHandler(mux, "StartRound", func(ctx context.Context, in *models.Round) (interface{}, error) {
 		return s.StartRound(ctx, in)

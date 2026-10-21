@@ -59,7 +59,6 @@ namespace TexasHoldem.BDD.Clients
         public Task<List<Player>> SetGamePlayersAsync(Game game) => PostAsync<Game, List<Player>>("SetGamePlayers", game);
         public Task RemovePlayerFromGameAsync(Player player) => PostAsync<Player, object>("RemovePlayerFromGame", player);
         public Task<Round> CreateRoundFromGameAsync(Game game) => PostAsync<Game, Round>("CreateRoundFromGame", game);
-        public Task<Round> ValidatePreRoundAsync(Round round) => PostAsync<Round, Round>("ValidatePreRound", round);
         public Task<Round> StartRoundAsync(Round round) => PostAsync<Round, Round>("StartRound", round);
         public Task<Round> GetRoundAsync(Round round) => PostAsync<Round, Round>("GetRound", round);
         public Task<Round> CreateDeckAsync(Round round) => PostAsync<Round, Round>("CreateDeck", round);
