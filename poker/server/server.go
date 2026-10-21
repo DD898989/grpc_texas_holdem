@@ -341,17 +341,6 @@ func (s *Server) AllocateGameSlots(ctx context.Context, g *models.Game) (*models
 }
 
 func (s *Server) CreateGame(ctx context.Context, g *models.Game) (*models.Game, error) {
-	if g.GetName() == "" {
-		return nil, ErrEmptyGameName
-	}
-
-	exists, err := s.GetGameByName(ctx, g)
-	if err != nil {
-		return nil, err
-	}
-	if exists != nil && exists.GetId() != 0 {
-		return nil, ErrGameNameExists
-	}
 
 	toCreate := &models.Game{
 		Name:    g.GetName(),
@@ -371,16 +360,10 @@ func (s *Server) CreateGame(ctx context.Context, g *models.Game) (*models.Game, 
 }
 
 func (s *Server) SetButtonPositions(ctx context.Context, g *models.Game) (*models.Game, error) {
-	if g.GetName() == "" {
-		return nil, ErrEmptyGameName
-	}
 
 	game, err := s.GetGame(ctx, g)
 	if err != nil {
 		return nil, err
-	}
-	if game == nil {
-		return nil, ErrGameDoesntExist
 	}
 
 	toUpdate := map[string]interface{}{
@@ -399,16 +382,9 @@ func (s *Server) SetButtonPositions(ctx context.Context, g *models.Game) (*model
 }
 
 func (s *Server) SetMin(ctx context.Context, g *models.Game) (*models.Game, error) {
-	if g.GetName() == "" {
-		return nil, ErrEmptyGameName
-	}
-
 	game, err := s.GetGame(ctx, g)
 	if err != nil {
 		return nil, err
-	}
-	if game == nil {
-		return nil, ErrGameDoesntExist
 	}
 
 	if err := s.gormDb.Model(&models.Game{}).Where("id = ?", game.GetId()).Update("min", g.GetMin()).Error; err != nil {
