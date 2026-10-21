@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Dapper;
 using FluentAssertions;
-using Grpc.Net.Client;
 using MySqlConnector;
-using Poker;
 using Reqnroll;
+using TexasHoldem.BDD.Clients;
+using TexasHoldem.BDD.Models;
 
 [assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
 
@@ -16,7 +17,7 @@ namespace TexasHoldem.BDD.StepDefinitions
     [Binding]
     public class TexasHoldemSteps
     {
-        private readonly Poker.Poker.PokerClient _client;
+        private readonly PokerHttpClient _client;
         private readonly string _mysqlDb;
         private readonly string _mysqlConnStr;
 
@@ -47,10 +48,9 @@ namespace TexasHoldem.BDD.StepDefinitions
 
         public TexasHoldemSteps()
         {
-            var grpcPort = Environment.GetEnvironmentVariable("GRPC_PORT") ?? "50051";
-            var grpcHost = Environment.GetEnvironmentVariable("GRPC_HOST") ?? "127.0.0.1";
-            var channel = GrpcChannel.ForAddress($"http://{grpcHost}:{grpcPort}");
-            _client = new Poker.Poker.PokerClient(channel);
+            var httpPort = Environment.GetEnvironmentVariable("HTTP_PORT") ?? Environment.GetEnvironmentVariable("GRPC_PORT") ?? "50051";
+            var httpHost = Environment.GetEnvironmentVariable("HTTP_HOST") ?? Environment.GetEnvironmentVariable("GRPC_HOST") ?? "127.0.0.1";
+            _client = new PokerHttpClient($"http://{httpHost}:{httpPort}");
 
             _mysqlDb = Environment.GetEnvironmentVariable("MYSQL_DB") ?? "poker";
             _mysqlConnStr = $"Server=127.0.0.1;Port=3306;Database={_mysqlDb};Uid=root;Pwd=rootpassword;AllowUserVariables=True;";
@@ -132,22 +132,22 @@ namespace TexasHoldem.BDD.StepDefinitions
                 _player2 = newPlayer;
             }
 
-            _game!.Players = new Players();
+            _game!.Players = new List<Player>();
             foreach (var p in _namedPlayers.Values)
             {
-                _game.Players.Players_.Add(p);
+                _game.Players.Add(p);
             }
 
             await _client.SetGamePlayersAsync(_game);
             _game = await _client.GetGameAsync(new Game { Id = _game.Id });
 
-            _game.Players.Players_.Should().HaveCount(_namedPlayers.Count);
+            _game.Players!.Should().HaveCount(_namedPlayers.Count);
         }
 
         [When(@"遊戲完成座位分配與設定盲注 (.*) 籌碼")]
         public async Task WhenGameAllocatesSlotsAndBlinds(long minChips)
         {
-            _game = await _client.AllocateGameSlotsAsync(_game);
+            _game = await _client.AllocateGameSlotsAsync(_game!);
             _game.Min = minChips;
             _game = await _client.SetMinAsync(_game);
             _game = await _client.SetButtonPositionsAsync(_game);
@@ -801,12 +801,12 @@ namespace TexasHoldem.BDD.StepDefinitions
                 Min = 10
             });
 
-            _game.Players = new Players();
-            _game.Players.Players_.Add(_player1);
+            _game.Players = new List<Player>();
+            _game.Players.Add(_player1);
 
             await _client.SetGamePlayersAsync(_game);
             _game = await _client.GetGameAsync(new Game { Id = _game.Id });
-            _game.Players.Players_.Should().HaveCount(1);
+            _game.Players!.Should().HaveCount(1);
         }
 
         [When(@"非當前輪到的玩家嘗試進行跟注")]
@@ -958,14 +958,7 @@ namespace TexasHoldem.BDD.StepDefinitions
         public void ThenSystemShouldRejectWithError(string expectedError)
         {
             _lastException.Should().NotBeNull("預期系統應拒絕該操作並拋出異常");
-            if (_lastException is Grpc.Core.RpcException rpcEx)
-            {
-                rpcEx.Status.Detail.Should().Contain(expectedError, $"RPC 錯誤訊息應包含 '{expectedError}'");
-            }
-            else
-            {
-                _lastException!.Message.Should().Contain(expectedError, $"異常訊息應包含 '{expectedError}'");
-            }
+            _lastException!.Message.Should().Contain(expectedError, $"異常訊息應包含 '{expectedError}'");
         }
 
         private static string FormatDbValue(object? actual, string expected)

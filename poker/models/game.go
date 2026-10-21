@@ -1,46 +1,38 @@
 package models
 
 import (
-	"github.com/jinzhu/gorm"
+	"time"
+
 	"grpc_texas_holdem/poker/deck"
-	pb "grpc_texas_holdem/poker/protobufs"
 )
 
 type Game struct {
-	gorm.Model
+	ID        int64      `gorm:"primary_key;AUTO_INCREMENT"`
+	CreatedAt time.Time  `json:"-"`
+	UpdatedAt time.Time  `json:"-"`
+	DeletedAt *time.Time `sql:"index" json:"-"`
+
 	Name    string
 	Dealer  int64
 	Min     int64
 	InRound bool
+	Players []*Player `gorm:"-"`
+	Rounds  []*Round  `gorm:"-"`
 }
 
-// ProtoUnMarshal gets db representation of the protobuf
-func (g *Game) ProtoUnMarshal(game *pb.Game) {
-	g.Model.ID = uint(game.GetId())
-	g.Name = game.GetName()
-	g.Dealer = game.GetDealer()
-	g.Min = game.GetMin()
-	g.InRound = game.GetInRound()
-}
-
-// ProtoMarshal gets the protobuf representation of the DB
-func (g *Game) ProtoMarshal() *pb.Game {
-	return &pb.Game{
-		Id:      int64(g.Model.ID),
-		Name:    g.Name,
-		Dealer:  g.Dealer,
-		Min:     g.Min,
-		InRound: g.InRound,
-	}
-}
+func (g *Game) GetId() int64         { if g == nil { return 0 }; return g.ID }
+func (g *Game) GetName() string      { if g == nil { return "" }; return g.Name }
+func (g *Game) GetDealer() int64     { if g == nil { return 0 }; return g.Dealer }
+func (g *Game) GetMin() int64        { if g == nil { return 0 }; return g.Min }
+func (g *Game) GetInRound() bool     { if g == nil { return false }; return g.InRound }
+func (g *Game) GetPlayers() []*Player { if g == nil { return nil }; return g.Players }
+func (g *Game) GetRounds() []*Round   { if g == nil { return nil }; return g.Rounds }
 
 func (g *Game) MarshalRound() *Round {
 	d := deck.New()
 
 	return &Round{
-		// Id is nil as it will be created
 		Deck: d.String(),
-		Game: int64(g.ID),
+		Game: g.ID,
 	}
-
 }

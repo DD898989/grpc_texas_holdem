@@ -1,41 +1,63 @@
 package models
 
 import (
-	"github.com/jinzhu/gorm"
-	pb "grpc_texas_holdem/poker/protobufs"
+	"time"
 )
 
 type Bet struct {
-	gorm.Model
-	Status string
-	Round  int64
-	Game   int64
-	Player int64
-	Chips  int64
-	Type   string
+	ID        int64      `gorm:"primary_key;AUTO_INCREMENT"`
+	CreatedAt time.Time  `json:"-"`
+	UpdatedAt time.Time  `json:"-"`
+	DeletedAt *time.Time `sql:"index" json:"-"`
+
+	DbStatus string      `gorm:"column:status" json:"-"`
+	Status   RoundStatus `gorm:"-"`
+	Round    int64
+	Game     int64
+	Player   int64
+	Chips    int64
+	DbType   string  `gorm:"column:type" json:"-"`
+	Type     BetType `gorm:"-"`
 }
 
-// ProtoUnMarshal gets db representation of the protobuf
-func (b *Bet) ProtoUnMarshal(bet *pb.Bet) {
-	b.Model.ID = uint(bet.GetId())
-	b.Status = bet.GetStatus().String()
-	b.Round = bet.GetRound()
-	b.Game = bet.GetGame()
-	b.Player = bet.GetPlayer()
-	b.Chips = bet.GetChips()
-	b.Type = bet.GetType().String()
-
-}
-
-// ProtoMarshal gets the protobuf representation of the DB
-func (b *Bet) ProtoMarshal() *pb.Bet {
-	return &pb.Bet{
-		Id:     int64(b.Model.ID),
-		Status: pb.RoundStatus(pb.RoundStatus_value[b.Status]),
-		Round:  b.Round,
-		Game:   b.Game,
-		Player: b.Player,
-		Chips:  b.Chips,
-		Type:   pb.Bet_BetType(pb.Bet_BetType_value[b.Type]),
+func (b *Bet) GetId() int64 { if b == nil { return 0 }; return b.ID }
+func (b *Bet) GetStatus() RoundStatus {
+	if b == nil {
+		return RoundStatus_NOT_STARTED
 	}
+	if b.Status == RoundStatus_NOT_STARTED && b.DbStatus != "" {
+		return ParseRoundStatus(b.DbStatus)
+	}
+	return b.Status
+}
+func (b *Bet) GetRound() int64  { if b == nil { return 0 }; return b.Round }
+func (b *Bet) GetGame() int64   { if b == nil { return 0 }; return b.Game }
+func (b *Bet) GetPlayer() int64 { if b == nil { return 0 }; return b.Player }
+func (b *Bet) GetChips() int64  { if b == nil { return 0 }; return b.Chips }
+func (b *Bet) GetType() BetType {
+	if b == nil {
+		return Bet_NONE
+	}
+	if b.Type == Bet_NONE && b.DbType != "" {
+		return ParseBetType(b.DbType)
+	}
+	return b.Type
+}
+
+func (b *Bet) AfterFind() error {
+	b.Status = ParseRoundStatus(b.DbStatus)
+	b.Type = ParseBetType(b.DbType)
+	return nil
+}
+
+func (b *Bet) BeforeCreate() error {
+	b.DbStatus = b.GetStatus().String()
+	b.DbType = b.GetType().String()
+	return nil
+}
+
+func (b *Bet) BeforeSave() error {
+	b.DbStatus = b.GetStatus().String()
+	b.DbType = b.GetType().String()
+	return nil
 }

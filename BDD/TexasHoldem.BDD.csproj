@@ -19,16 +19,6 @@
     <PackageReference Include="FluentAssertions" Version="7.2.0" />
     <PackageReference Include="MySqlConnector" Version="2.4.0" />
     <PackageReference Include="Dapper" Version="2.1.66" />
-    <PackageReference Include="Google.Protobuf" Version="3.30.0" />
-    <PackageReference Include="Grpc.Net.Client" Version="2.67.0" />
-    <PackageReference Include="Grpc.Tools" Version="2.67.0">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Protobuf Include="..\poker\protobufs\poker.proto" GrpcServices="Client" Link="Protos\poker.proto" />
   </ItemGroup>
 
 </Project>

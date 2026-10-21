@@ -6,7 +6,7 @@ setlocal enabledelayedexpansion
 
 
 echo ========================================================
-echo       Starting Texas Hold'em BDD Automation Flow
+echo       Starting Texas Hold'em BDD Automation Flow (HTTP)
 echo ========================================================
 
 :: 1. Generate random port (between 50000 and 59999)
@@ -17,10 +17,10 @@ for /f %%i in ('powershell -NoProfile -Command "[DateTimeOffset]::UtcNow.ToUnixT
     set DBNAME=%%i
 )
 
-echo [INFO] Random gRPC Port: %PORT%
+echo [INFO] Random HTTP Port: %PORT%
 echo [INFO] Dynamic DB Name:  %DBNAME%
 
-:: 3. Start Go gRPC server in background (hidden window)
+:: 3. Start Go HTTP server in background (hidden window)
 echo [INFO] Starting poker\run_server\main.go in background...
 powershell -NoProfile -Command "Start-Process -FilePath 'go' -ArgumentList 'run', 'main.go', '%PORT%', '%DBNAME%' -WorkingDirectory '%~dp0poker\run_server' -WindowStyle Hidden"
 
@@ -53,6 +53,7 @@ echo [INFO] Server is ready!
 echo ========================================================
 echo       Running .NET 10 BDD Tests (Reqnroll + xUnit)
 echo ========================================================
+set "HTTP_PORT=%PORT%"
 set "GRPC_PORT=%PORT%"
 set "MYSQL_DB=%DBNAME%"
 

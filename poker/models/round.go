@@ -1,59 +1,77 @@
 package models
 
 import (
-	"github.com/jinzhu/gorm"
-	pb "grpc_texas_holdem/poker/protobufs"
+	"time"
 )
 
-// db representation of a round of 1 sequence of dealing out cards
 type Round struct {
-	gorm.Model
-	Deck   string
-	Status string
-	Flop   string
-	Turn   string
-	River  string
-	Game   int64
-	Action int64
+	ID        int64      `gorm:"primary_key;AUTO_INCREMENT"`
+	CreatedAt time.Time  `json:"-"`
+	UpdatedAt time.Time  `json:"-"`
+	DeletedAt *time.Time `sql:"index" json:"-"`
+
+	Deck          string
+	DbStatus      string      `gorm:"column:status" json:"-"`
+	Status        RoundStatus `gorm:"-"`
+	Flop          string
+	Turn          string
+	River         string
+	Game          int64
+	Action        int64
 	WinningPlayer int64
 	WinningHand   string
-	WinningScore uint32
+	WinningScore  uint32
+	TestD         string `gorm:"-"`
+
+	Players []*Player `gorm:"-"`
+	Bets    []*Bet    `gorm:"-"`
 }
 
 type RoundPlayers struct {
-	gorm.Model
+	ID        int64      `gorm:"primary_key;AUTO_INCREMENT"`
+	CreatedAt time.Time  `json:"-"`
+	UpdatedAt time.Time  `json:"-"`
+	DeletedAt *time.Time `sql:"index" json:"-"`
+
 	Round  int64
 	Player int64
 	Game   int64
 }
 
-func (r *Round) ProtoUnMarshal(round *pb.Round) {
-	r.Model.ID = uint(round.GetId())
-	r.Deck = round.GetDeck()
-	r.Flop = round.GetFlop()
-	r.Turn = round.GetTurn()
-	r.River = round.GetRiver()
-	r.Game = round.GetGame()
-	r.Status = round.GetStatus().String()
-	r.Action = round.GetAction()
-	r.WinningHand = round.GetWinningHand()
-	r.WinningPlayer = round.GetWinningPlayer()
-	r.WinningScore = round.GetWinningScore()
+func (r *Round) GetId() int64 { if r == nil { return 0 }; return r.ID }
+func (r *Round) GetStatus() RoundStatus {
+	if r == nil {
+		return RoundStatus_NOT_STARTED
+	}
+	if r.Status == RoundStatus_NOT_STARTED && r.DbStatus != "" {
+		return ParseRoundStatus(r.DbStatus)
+	}
+	return r.Status
+}
+func (r *Round) GetPlayers() []*Player      { if r == nil { return nil }; return r.Players }
+func (r *Round) GetDeck() string            { if r == nil { return "" }; return r.Deck }
+func (r *Round) GetFlop() string            { if r == nil { return "" }; return r.Flop }
+func (r *Round) GetTurn() string            { if r == nil { return "" }; return r.Turn }
+func (r *Round) GetRiver() string           { if r == nil { return "" }; return r.River }
+func (r *Round) GetBets() []*Bet            { if r == nil { return nil }; return r.Bets }
+func (r *Round) GetGame() int64             { if r == nil { return 0 }; return r.Game }
+func (r *Round) GetAction() int64           { if r == nil { return 0 }; return r.Action }
+func (r *Round) GetWinningPlayer() int64    { if r == nil { return 0 }; return r.WinningPlayer }
+func (r *Round) GetWinningHand() string     { if r == nil { return "" }; return r.WinningHand }
+func (r *Round) GetWinningScore() uint32    { if r == nil { return 0 }; return r.WinningScore }
+func (r *Round) GetTEST_d() string          { if r == nil { return "" }; return r.TestD }
+
+func (r *Round) AfterFind() error {
+	r.Status = ParseRoundStatus(r.DbStatus)
+	return nil
 }
 
-// ProtoMarshal gets the protobuf representation of the DB
-func (p *Round) ProtoMarshal() *pb.Round {
-	return &pb.Round{
-		Id:     int64(p.Model.ID),
-		Deck:   p.Deck,
-		Flop:   p.Flop,
-		Turn:   p.Turn,
-		River:  p.River,
-		Game:   p.Game,
-		Status: pb.RoundStatus(pb.RoundStatus_value[p.Status]),
-		Action: p.Action,
-		WinningHand:p.WinningHand,
-		WinningScore:p.WinningScore,
-		WinningPlayer:p.WinningPlayer,
-	}
+func (r *Round) BeforeCreate() error {
+	r.DbStatus = r.GetStatus().String()
+	return nil
+}
+
+func (r *Round) BeforeSave() error {
+	r.DbStatus = r.GetStatus().String()
+	return nil
 }

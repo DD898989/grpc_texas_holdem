@@ -1,52 +1,37 @@
 package models
 
 import (
-	"github.com/jinzhu/gorm"
-	pb "grpc_texas_holdem/poker/protobufs"
+	"time"
 )
 
 type Player struct {
-	gorm.Model
+	ID        int64      `gorm:"primary_key;AUTO_INCREMENT"`
+	CreatedAt time.Time  `json:"-"`
+	UpdatedAt time.Time  `json:"-"`
+	DeletedAt *time.Time `sql:"index" json:"-"`
+
 	Name   string
 	Chips  int64
 	Slot   int64
 	Cards  string
 	InHand bool
+	Score  uint32 `gorm:"-"`
 }
 
 type GamePlayers struct {
-	gorm.Model
+	ID        int64      `gorm:"primary_key;AUTO_INCREMENT"`
+	CreatedAt time.Time  `json:"-"`
+	UpdatedAt time.Time  `json:"-"`
+	DeletedAt *time.Time `sql:"index" json:"-"`
+
 	Player int64
 	Game   int64
 }
 
-func (p *Player) ProtoUnMarshal(player *pb.Player) {
-	p.Model.ID = uint(player.GetId())
-	p.Name = player.GetName()
-	p.Chips = player.GetChips()
-	p.Slot = player.GetSlot()
-	p.InHand = player.GetInHand()
-	p.Cards = player.GetCards()
-
-}
-
-// ProtoMarshal gets the protobuf representation of the DB
-func (p *Player) ProtoMarshal() *pb.Player {
-	return &pb.Player{
-		Id:     int64(p.Model.ID),
-		Name:   p.Name,
-		Chips:  p.Chips,
-		Slot:   p.Slot,
-		InHand: p.InHand,
-		Cards:  p.Cards,
-	}
-}
-
-func MarshalPlayers(outs []*Player) *pb.Players {
-
-	out := &pb.Players{}
-	for _, inp := range outs {
-		out.Players = append(out.Players, inp.ProtoMarshal())
-	}
-	return out
-}
+func (p *Player) GetId() int64     { if p == nil { return 0 }; return p.ID }
+func (p *Player) GetName() string  { if p == nil { return "" }; return p.Name }
+func (p *Player) GetChips() int64  { if p == nil { return 0 }; return p.Chips }
+func (p *Player) GetSlot() int64   { if p == nil { return 0 }; return p.Slot }
+func (p *Player) GetCards() string { if p == nil { return "" }; return p.Cards }
+func (p *Player) GetInHand() bool  { if p == nil { return false }; return p.InHand }
+func (p *Player) GetScore() uint32 { if p == nil { return 0 }; return p.Score }
