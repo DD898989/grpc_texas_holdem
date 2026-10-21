@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 
@@ -398,6 +400,29 @@ func (s *Server) SetMin(ctx context.Context, g *models.Game) (*models.Game, erro
 	return out, nil
 }
 
+func getNextInHandPlayerBySlot(players []*models.Player, currentSlot int64) (*models.Player, error) {
+	sortedPlayers := slices.Clone(players)
+	slices.SortFunc(sortedPlayers, func(a, b *models.Player) int {
+		return cmp.Compare(a.GetSlot(), b.GetSlot())
+	})
+
+	for i, p := range sortedPlayers {
+		if p.GetSlot() != currentSlot {
+			continue
+		}
+
+		for step := 1; step < len(sortedPlayers); step++ {
+			candidate := sortedPlayers[(i+step)%len(sortedPlayers)]
+			if candidate.GetInHand() {
+				return candidate, nil
+			}
+		}
+		break
+	}
+
+	return nil, game_ring.ErrNoPlayerInHand
+}
+
 func (s *Server) SetNextOnBet(ctx context.Context, in *models.Round) (*models.Round, error) {
 	r, err := s.GetRound(ctx, in)
 	if err != nil {
@@ -409,17 +434,7 @@ func (s *Server) SetNextOnBet(ctx context.Context, in *models.Round) (*models.Ro
 		return nil, err
 	}
 
-	gr, err := game_ring.NewRing(g)
-	if err != nil {
-		return nil, err
-	}
-
-	p, err := gr.GetPlayerFromSlot(&models.Player{Slot: in.GetAction()})
-	if err != nil {
-		return nil, err
-	}
-
-	nextAction, err := gr.NextInHand(p)
+	nextAction, err := getNextInHandPlayerBySlot(g.GetPlayers(), in.GetAction())
 	if err != nil {
 		return nil, err
 	}
@@ -431,54 +446,6 @@ func (s *Server) SetNextOnBet(ctx context.Context, in *models.Round) (*models.Ro
 		return nil, err
 	}
 	return r, nil
-}
-
-func (s *Server) ValidatePreGame(ctx context.Context, g *models.Game) (*models.Game, error) {
-	if g.InRound {
-		return nil, ErrGameInRound
-	}
-
-	slotMap := map[int64]int64{}
-	userMap := map[int64]int64{}
-	slotList := []int64{}
-
-	for _, player := range g.GetPlayers() {
-		if player.GetSlot() < 1 || player.GetSlot() > 8 {
-			return g, ErrInvalidSlotNumber
-		}
-		if _, ok := slotMap[player.GetId()]; ok {
-			return g, ErrInvalidSlotNumber
-		}
-		slotMap[player.GetId()] = player.GetSlot()
-		userMap[player.GetSlot()] = player.GetId()
-		slotList = append(slotList, player.GetSlot())
-	}
-
-	sort.Slice(slotList, func(i, j int) bool {
-		return slotList[i] < slotList[j]
-	})
-
-	for i, v := range slotList {
-		if i != 0 {
-			prev := slotList[i-1]
-			if !(prev < v) {
-				return g, ErrInvalidSlotNumber
-			}
-		}
-		if v == 0 {
-			return g, ErrInvalidSlotNumber
-		}
-	}
-
-	if g.GetDealer() == 0 {
-		return g, ErrInvalidButtonAllocation
-	}
-
-	if g.GetMin() < 1 {
-		return g, ErrNoBetSet
-	}
-
-	return g, nil
 }
 
 func (s *Server) RemovePlayerFromGame(ctx context.Context, player *models.Player) (*models.Empty, error) {
@@ -588,11 +555,6 @@ func (s *Server) CreateRoundFromGame(ctx context.Context, g *models.Game) (*mode
 		return nil, ErrGameDoesntExist
 	}
 
-	game, err = s.ValidatePreGame(ctx, game)
-	if err != nil {
-		return nil, err
-	}
-
 	r := game.MarshalRound()
 	if err := s.gormDb.Create(r).Error; err != nil {
 		return nil, err
@@ -637,11 +599,6 @@ func (s *Server) ValidatePreRound(ctx context.Context, r *models.Round) (*models
 	}
 
 	game, err := s.GetGame(ctx, &models.Game{ID: r.Game})
-	if err != nil {
-		return nil, err
-	}
-
-	game, err = s.ValidatePreGame(ctx, game)
 	if err != nil {
 		return nil, err
 	}
@@ -1448,9 +1405,6 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	})
 	registerHandler(mux, "SetMin", func(ctx context.Context, in *models.Game) (interface{}, error) {
 		return s.SetMin(ctx, in)
-	})
-	registerHandler(mux, "ValidatePreGame", func(ctx context.Context, in *models.Game) (interface{}, error) {
-		return s.ValidatePreGame(ctx, in)
 	})
 	registerHandler(mux, "UpdateGameInRound", func(ctx context.Context, in *models.Game) (interface{}, error) {
 		return s.UpdateGameInRound(ctx, in)
