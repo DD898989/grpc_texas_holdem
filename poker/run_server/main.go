@@ -1,16 +1,14 @@
 package main
 
 import (
-	"fmt"
 	"os"
-	"time"
 
 	"grpc_texas_holdem/poker/server"
 )
 
 func main() {
 	port := "50051"
-	dbName := fmt.Sprintf("poker_%d", time.Now().Unix())
+	dbName := "poker"
 
 	if len(os.Args) > 1 && os.Args[1] != "" {
 		port = os.Args[1]

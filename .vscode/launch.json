@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Server",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/poker/run_server"
+           },
+           {
+               "name": "Launch Client",
+               "type": "go",
+               "request": "launch",
+               "mode": "auto",
+               "program": "${workspaceFolder}/poker/run_client"
+           }
+       ]
+   }
