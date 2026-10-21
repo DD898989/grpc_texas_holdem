@@ -3,3 +3,11 @@
 poker.db
 *.db
 .out
+run_server.exe
+/PLAY/obj
+/PLAY/bin
+/PLAY/.vs
+/BDD/obj
+/BDD/bin
+BDD/Features/*.feature.cs
+BDD/.vs/

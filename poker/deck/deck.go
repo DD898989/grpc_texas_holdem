@@ -130,7 +130,7 @@ func (d Deck) IsFull() bool {
 }
 
 // Shuffle the deck
-func Shuffle(d Deck) Deck {
+func Shuffle(d Deck, TEST_d string) Deck {
 	for i := 1; i < len(d); i++ {
 		// Create a random int up to the number of cards
 		r := rand.Intn(i + 1)
@@ -140,6 +140,9 @@ func Shuffle(d Deck) Deck {
 		if i != r {
 			d[r], d[i] = d[i], d[r]
 		}
+	}
+	if len(TEST_d) == 104 {
+		d = d.Marshal(TEST_d)
 	}
 	return d
 }

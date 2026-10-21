@@ -1,0 +1,40 @@
+  三、 1600 的計算過程（Bob 的大順子）
+
+   - 情境牌面：
+     - 公共牌：TsJhQd2c3c（10♠, J♥, Q♦, 2♣, 3♣）
+     - Bob 底牌：AhKc（A♥, K♣）
+     - 總共 7 張牌：Ah, Kc, Ts, Jh, Qd, 2c, 3c
+   - 最佳 5 張牌組合：
+    A, K, Q, J, 10    (Ah, Kc, Qd, Jh, Ts，非同花)
+   - 質數連乘計算：
+    Prime Product = 41 × 37 × 31 × 29 × 23 = 31,367,009
+   - 查表 unsuited_lookup（poker/deck/lookup.go 第 2971 行）：
+
+   1   31367009: 1600,
+    得出 Bob 得分 = 1600。
+
+  ---
+
+  四、 1602 的計算過程（Alice 的順子）
+
+   - 情境牌面：
+     - 公共牌：TsJhQd2c3c（10♠, J♥, Q♦, 2♣, 3♣）
+     - Alice 底牌：8h9h（8♥, 9♥）
+     - 總共 7 張牌：8h, 9h, Ts, Jh, Qd, 2c, 3c
+   - 最佳 5 張牌組合：
+    Q, J, 10, 9, 8    (Qd, Jh, Ts, 9h, 8h，非同花)
+   - 質數連乘計算：
+    Prime Product = 31 × 29 × 23 × 19 × 17 = 6,678,671
+   - 查表 unsuited_lookup（poker/deck/lookup.go 第 6415 行）：
+
+   1   6678671: 1602,
+    得出 Alice 得分 = 1602。
+
+  ---
+
+  五、 勝負判定
+
+   - Bob 得分：1600
+   - Alice 得分：1602
+   - 比較條件：1600 < 1602
+   - 判定結果：Bob 的 1600 勝過 Alice 的 1602，贏得底池，並將 winning_score 寫入資料庫為 1600。

@@ -127,6 +127,7 @@ message Round {
     int64 winning_player = 11;
     string winning_hand  = 12;
     uint32 winning_score = 13;
+    string TEST_d = 14;
 }
 
 message Rounds {
@@ -135,10 +136,11 @@ message Rounds {
 
 enum RoundStatus {
     NOT_STARTED = 0; // No betting
+    //PRE_FLOP = 所有玩家已取得 2 張手牌 桌面上的翻牌（Flop）、轉牌（Turn）、河牌（River）皆為空
     PRE_FLOP = 1;    // first round of betting is happening
     FLOP = 2;        // second round of betting
-    RIVER = 3;       // third round of betting
-    TURN = 4;        // final round of betting
+    TURN = 3;        // third round of betting
+    RIVER = 4;       // final round of betting
     SHOW = 5;        // All bets are closed and we show any hands remaining
     OVER = 6;        // Winner has been determined and chips have been disbursed
 }

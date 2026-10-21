@@ -115,16 +115,21 @@ func init() {
 func Logic(args []string) uint32 {
 	cards := make([]uint32, len(args))
 	for i := 0; i < len(args); i++ {
+		// 將每張牌轉為 32-bit 整數（包含質數、點數、花色）
 		cards[i] = make_card(args[i])
 	}
 
 	// get the permutations and the evaluation function
+	// 根據 7 張牌長度，取得 21 種 5 張牌組合
 	possible_hands := hand_permutations(cards, HANDSIZE_TO_PERMUTATION_MAP[len(cards)])
 
+	// 初始值設為最差分數（7462）
 	best_score := uint32(7462)
 	for _, hand := range possible_hands {
+		// 計算這 5 張牌的分數
 		handscore := five(hand)
 		if handscore < best_score {
+			// 分數越小代表牌型越強，保留最佳（最小）分數
 			best_score = handscore
 		}
 	}
@@ -132,13 +137,16 @@ func Logic(args []string) uint32 {
 }
 
 func five(cards []uint32) uint32 {
+	// 檢查 5 張牌的花色 bitwise AND 是否成立
 	if cards[0]&cards[1]&cards[2]&cards[3]&cards[4]&0xF000 != 0 {
 		// if flush
+		// 是同花（Flush / Straight Flush）
 		handOR := (cards[0] | cards[1] | cards[2] | cards[3] | cards[4]) >> 16
 		prime := prime_product_from_rankbits(handOR)
 		return FLUSH_LOOKUP[prime]
 	} else {
 		// non-flush
+		// 非同花（Non-flush）
 		prime := prime_product_from_hand(cards)
 		return UNSUITED_LOOKUP[prime]
 	}
@@ -170,9 +178,32 @@ func make_card(cardstring string) uint32 {
 		and is also quite performant.
 	*/
 
+	/*
+			實例示範：以 "Ah"（紅心 A）為例
+
+		   1. rank = 12 (0x0C，二進位 1100)
+		   2. rankprime = 41 (0x29，二進位 0010 1001)
+		   3. bitrank = 1 << 12 << 16 = 1 << 28 = 0x10000000
+		   4. suit = 2 << 12 = 0x00002000
+		   5. rank << 8 = 12 << 8 = 0x00000C00
+		   6. 最後 OR 組合：
+
+		         bitrank:    0001 0000 0000 0000 0000 0000 0000 0000  (0x10000000)
+		         suit:       0000 0000 0000 0000 0010 0000 0000 0000  (0x00002000)
+		         rank<<8:    0000 0000 0000 0000 0000 1100 0000 0000  (0x00000C00)
+		       | rankprime:  0000 0000 0000 0000 0000 0000 0010 1001  (0x00000029)
+		       -------------------------------------------------------------------
+		         結果 (Ah):  0001 0000 0000 0000 0010 1100 0010 1001  (0x10002C29)
+		  一張 "Ah" 牌就被壓縮成單一整數 0x10002C29
+	*/
+
+	//高牌
 	rank := STRING_INT_TO_RANK[cardstring[0]]
+	//質數
 	rankprime := STRING_INT_TO_PRIME[cardstring[0]]
+	//高牌
 	bitrank := uint32(1) << rank << 16
+	//花色
 	suit := STRING_INT_TO_SUIT[cardstring[1]] << 12
 	return bitrank | suit | (rank << 8) | rankprime
 }

@@ -31,8 +31,8 @@ const (
 	RoundStatus_NOT_STARTED RoundStatus = 0
 	RoundStatus_PRE_FLOP    RoundStatus = 1
 	RoundStatus_FLOP        RoundStatus = 2
-	RoundStatus_RIVER       RoundStatus = 3
-	RoundStatus_TURN        RoundStatus = 4
+	RoundStatus_TURN        RoundStatus = 3
+	RoundStatus_RIVER       RoundStatus = 4
 	RoundStatus_SHOW        RoundStatus = 5
 	RoundStatus_OVER        RoundStatus = 6
 )
@@ -41,8 +41,8 @@ var RoundStatus_name = map[int32]string{
 	0: "NOT_STARTED",
 	1: "PRE_FLOP",
 	2: "FLOP",
-	3: "RIVER",
-	4: "TURN",
+	3: "TURN",
+	4: "RIVER",
 	5: "SHOW",
 	6: "OVER",
 }
@@ -51,8 +51,8 @@ var RoundStatus_value = map[string]int32{
 	"NOT_STARTED": 0,
 	"PRE_FLOP":    1,
 	"FLOP":        2,
-	"RIVER":       3,
-	"TURN":        4,
+	"TURN":        3,
+	"RIVER":       4,
 	"SHOW":        5,
 	"OVER":        6,
 }
@@ -438,6 +438,7 @@ type Round struct {
 	WinningPlayer        int64    `protobuf:"varint,11,opt,name=winning_player,json=winningPlayer,proto3" json:"winning_player,omitempty"`
 	WinningHand          string   `protobuf:"bytes,12,opt,name=winning_hand,json=winningHand,proto3" json:"winning_hand,omitempty"`
 	WinningScore         uint32   `protobuf:"varint,13,opt,name=winning_score,json=winningScore,proto3" json:"winning_score,omitempty"`
+	TEST_d               string   `protobuf:"bytes,14,opt,name=TEST_d,json=tESTD,proto3" json:"TEST_d,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -557,6 +558,33 @@ func (m *Round) GetWinningScore() uint32 {
 		return m.WinningScore
 	}
 	return 0
+}
+
+func (m *Round) GetTEST_d() string {
+	if m != nil {
+		if m.TEST_d != "" {
+			return m.TEST_d
+		}
+		for i := 0; i < len(m.XXX_unrecognized); {
+			tag := m.XXX_unrecognized[i]
+			if tag == 0x72 {
+				i++
+				if i < len(m.XXX_unrecognized) {
+					l := int(m.XXX_unrecognized[i])
+					i++
+					if i+l <= len(m.XXX_unrecognized) {
+						return string(m.XXX_unrecognized[i : i+l])
+					}
+				}
+			}
+			i++
+		}
+	}
+	return ""
+}
+
+func (m *Round) GetTEST_D() string {
+	return m.GetTEST_d()
 }
 
 type Rounds struct {

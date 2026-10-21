@@ -7,20 +7,17 @@ import (
 	"math/rand"
 	"net"
 	"sort"
+	"strings"
 
-	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"google.golang.org/grpc"
 	"grpc_texas_holdem/poker/deck"
 	"grpc_texas_holdem/poker/models"
 	pb "grpc_texas_holdem/poker/protobufs"
 	"grpc_texas_holdem/poker/server/game_ring"
-)
 
-const (
-	Port   = ":50051"
-	dbName = "poker"
+	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -45,19 +42,18 @@ var (
 	ErrGameIsNotInRound        = fmt.Errorf("game is not in round")
 	ErrWrongBetType            = fmt.Errorf("wrong bet type")
 	ErrNoBetTypeSet            = fmt.Errorf("no bet type set")
-	ErrUnImplementedLogic      = fmt.Errorf("this logic is unimplemented")
 	ErrIncorrectBetForBetType  = fmt.Errorf("incorrect amount of chips for the given bet")
 	ErrPlayerNotInHand         = fmt.Errorf("the given player is not in hand and can not perform that action")
 	ErrIncompleteBets          = fmt.Errorf("wrong number of bets for round")
 	ErrWrongBetStatus          = fmt.Errorf("wrong bet status")
 	ErrNoExistingCards         = fmt.Errorf("expecting existing cards, but no cards for player in hand")
-	ErrNoWinningPlayer         = fmt.Errorf("no winning player determined")
 )
 
 // TODOS:
 // Add test for exiting early when everyone folds.
 
 type Server struct {
+	pb.UnimplementedPokerServer
 	gormDb *gorm.DB
 }
 
@@ -67,15 +63,19 @@ func NewServer(name string) (*Server, error) {
 	return s, err
 }
 
-func Run() {
-	lis, err := net.Listen("tcp", Port)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+func RunWithConfig(port string, dbName string) {
+	if !strings.HasPrefix(port, ":") {
+		port = ":" + port
 	}
+	lis, err := net.Listen("tcp", port)
+	if err != nil {
+		log.Fatalf("failed to listen on %s: %v", port, err)
+	}
+	log.Printf("Server listening on %s, connecting to MySQL db: %s", port, dbName)
 	s := grpc.NewServer()
 	serv, err := NewServer(dbName)
 	if err != nil {
-		log.Fatalf("failed to Start poker server: %v", err)
+		log.Fatalf("failed to start poker server: %v", err)
 	}
 	pb.RegisterPokerServer(s, serv)
 	if err := s.Serve(lis); err != nil {
@@ -84,10 +84,22 @@ func Run() {
 }
 
 func (s *Server) setupDatabase(name string) error {
-
-	db, err := gorm.Open("sqlite3", fmt.Sprintf("./%s.db", name))
+	dsnRoot := "root:rootpassword@tcp(127.0.0.1:3306)/?charset=utf8mb4&parseTime=True&loc=Local"
+	initDb, err := gorm.Open("mysql", dsnRoot)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to connect to MySQL server at 127.0.0.1:3306: %v", err)
+	}
+	createDbSql := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", name)
+	if err := initDb.Exec(createDbSql).Error; err != nil {
+		initDb.Close()
+		return fmt.Errorf("failed to create database %s: %v", name, err)
+	}
+	initDb.Close()
+
+	dsn := fmt.Sprintf("root:rootpassword@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", name)
+	db, err := gorm.Open("mysql", dsn)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database %s: %v", name, err)
 	}
 	// Setup Players table
 	if err := db.AutoMigrate(&models.Player{}).Error; err != nil {
@@ -134,7 +146,7 @@ func (s *Server) CreatePlayer(ctx context.Context, p *pb.Player) (*pb.Player, er
 	toCreate := &models.Player{}
 	toCreate.ProtoUnMarshal(p)
 
-	if err := s.gormDb.Create(toCreate).Error; err != nil {
+	if /*Player*/ err := s.gormDb.Create(toCreate).Error; err != nil {
 		return nil, err
 	}
 
@@ -143,19 +155,6 @@ func (s *Server) CreatePlayer(ctx context.Context, p *pb.Player) (*pb.Player, er
 		return nil, err
 	}
 	return player, nil
-
-}
-
-func (s *Server) CreatePlayers(ctx context.Context, players *pb.Players) (*pb.Players, error) {
-	out := &pb.Players{}
-	for _, p := range players.Players {
-		player, err := s.CreatePlayer(ctx, p)
-		if err != nil {
-			return nil, err
-		}
-		out.Players = append(out.Players, player)
-	}
-	return out, nil
 
 }
 
@@ -249,45 +248,6 @@ func (s *Server) GetRound(ctx context.Context, in *pb.Round) (*pb.Round, error) 
 	return round, nil
 }
 
-func (s *Server) DeleteGames(ctx context.Context, toDelete *pb.Games) (*empty.Empty, error) {
-
-	var ids = []int64{}
-	for _, game := range toDelete.GetGames() {
-		ids = append(ids, game.GetId())
-	}
-
-	if err := s.gormDb.Where("id in (?)", ids).Find(&models.Game{}).Error; err != nil && err != gorm.ErrRecordNotFound {
-		return &empty.Empty{}, err
-	} else if err != nil && err == gorm.ErrRecordNotFound {
-		return &empty.Empty{}, ErrGameDoesntExist
-	}
-
-	if err := s.gormDb.Where("id in (?)", ids).Delete(&models.Game{}).Error; err != nil {
-		return &empty.Empty{}, err
-	}
-	return &empty.Empty{}, nil
-}
-
-func (s *Server) DeletePlayers(ctx context.Context, toDelete *pb.Players) (*empty.Empty, error) {
-
-	var ids = []int64{}
-	for _, player := range toDelete.GetPlayers() {
-		ids = append(ids, player.GetId())
-	}
-
-	if err := s.gormDb.Where("id in (?)", ids).Find(&models.Player{}).Error; err != nil && err != gorm.ErrRecordNotFound {
-		return &empty.Empty{}, err
-	} else if err != nil && err == gorm.ErrRecordNotFound {
-		return &empty.Empty{}, ErrPlayerDoesntExist
-	}
-
-	if err := s.gormDb.Where("id in (?)", ids).Delete(&models.Player{}).Error; err != nil {
-		return &empty.Empty{}, err
-	}
-
-	return &empty.Empty{}, nil
-}
-
 func (s *Server) GetGameByName(ctx context.Context, in *pb.Game) (*pb.Game, error) {
 	g := &models.Game{}
 	if err := s.gormDb.Where("name = ?", in.GetName()).Find(&g).Error; err != nil && err != gorm.ErrRecordNotFound {
@@ -363,7 +323,7 @@ func (s *Server) SetGamePlayers(ctx context.Context, g *pb.Game) (*pb.Players, e
 
 	for _, shouldAdd := range playersToJoinMap {
 		toCreate := &models.GamePlayers{Player: shouldAdd.GetId(), Game: g.GetId()}
-		if err := s.gormDb.Create(toCreate).Error; err != nil {
+		if /*GamePlayers*/ err := s.gormDb.Create(toCreate).Error; err != nil {
 			return nil, err
 		}
 
@@ -382,7 +342,7 @@ func (s *Server) SetPlayerSlot(ctx context.Context, p *pb.Player) (*pb.Player, e
 	}
 	out := &models.Player{}
 
-	if err := s.gormDb.Where("id = ?", p.GetId()).Find(out).Update(
+	if /*Player*/ err := s.gormDb.Where("id = ?", p.GetId()).Find(out).Update(
 		"slot", p.GetSlot()).Error; err != nil {
 		return nil, err
 	}
@@ -438,7 +398,7 @@ func (s *Server) CreateGame(ctx context.Context, g *pb.Game) (*pb.Game, error) {
 
 	toCreate := &models.Game{}
 	toCreate.ProtoUnMarshal(g)
-	if err := s.gormDb.Create(toCreate).Error; err != nil {
+	if /*Game*/ err := s.gormDb.Create(toCreate).Error; err != nil {
 		return nil, err
 	}
 
@@ -545,50 +505,6 @@ func (s *Server) SetNextOnBet(ctx context.Context, in *pb.Round) (*pb.Round, err
 		return nil, err
 	}
 	return r, nil
-}
-
-func (s *Server) NextDealer(ctx context.Context, g *pb.Game) (*pb.Game, error) {
-	if g.GetName() == "" {
-		return nil, ErrEmptyGameName
-	}
-
-	game, err := s.GetGame(ctx, g)
-	if err != nil {
-		return nil, err
-	}
-	if game == nil {
-		return nil, ErrGameDoesntExist
-	}
-
-	r, err := game_ring.NewRing(g)
-	if err != nil {
-		return nil, err
-	}
-
-	err = r.CurrentSmallBlind()
-	if err != nil {
-		return nil, err
-	}
-	// Set new dealer to the current small blind
-	newDealer, err := r.MarshalValue()
-
-	toUpdate := models.Game{
-		Min: g.GetMin(),
-		// Randomly allocate a dealer
-		Dealer: newDealer.GetSlot(),
-	}
-
-	if err := s.gormDb.Where("id = ?", game.GetId()).Find(game).Updates(toUpdate).Error; err != nil {
-		return nil, err
-	}
-
-	out, err := s.GetGame(ctx, g)
-
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-
 }
 
 // ValidatePreGame returns an error if the game is invalid
@@ -754,7 +670,7 @@ func (s *Server) UpdateGameStatus(ctx context.Context, g *pb.Game) (*pb.Game, er
 	toUpdate := &models.Game{}
 	toUpdate.ProtoUnMarshal(g)
 
-	if err := s.gormDb.Where("id = ?", g.GetId()).Find(toUpdate).Update(
+	if /*Game*/ err := s.gormDb.Where("id = ?", g.GetId()).Find(toUpdate).Update(
 		"InRound", false).Error; err != nil {
 		return nil, err
 	}
@@ -791,7 +707,7 @@ func (s *Server) CreateRoundFromGame(ctx context.Context, g *pb.Game) (*pb.Round
 	// HydratePlayers
 	r := gModel.MarshalRound()
 
-	if err := s.gormDb.Create(r).Error; err != nil {
+	if /*Round*/ err := s.gormDb.Create(r).Error; err != nil {
 		return nil, err
 	}
 
@@ -816,7 +732,7 @@ func (s *Server) CreateRoundPlayers(ctx context.Context, r *pb.Round) (*pb.Round
 
 	for _, shouldAdd := range r.GetPlayers().GetPlayers() {
 		toCreate := &models.RoundPlayers{Player: shouldAdd.GetId(), Game: r.GetGame(), Round: r.GetId()}
-		if err := s.gormDb.Create(toCreate).Error; err != nil {
+		if /*RoundPlayers*/ err := s.gormDb.Create(toCreate).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -1091,7 +1007,7 @@ func (s *Server) UpdateDeck(ctx context.Context, r *pb.Round) (*pb.Round, error)
 
 	round.Deck = r.GetDeck()
 	out := &models.Round{}
-	if err := s.gormDb.Where("id = ?", round.GetId()).Find(out).Update(
+	if /*Round*/ err := s.gormDb.Where("id = ?", round.GetId()).Find(out).Update(
 		"deck", round.GetDeck()).Error; err != nil {
 		return nil, err
 	}
@@ -1109,7 +1025,7 @@ func (s *Server) SetAction(ctx context.Context, r *pb.Round) (*pb.Round, error) 
 		return nil, err
 	}
 	out := &models.Round{}
-	if err := s.gormDb.Where("id = ?", round.GetId()).Find(out).Update(
+	if /*Round*/ err := s.gormDb.Where("id = ?", round.GetId()).Find(out).Update(
 		"action", r.GetAction()).Error; err != nil {
 		return nil, err
 	}
@@ -1120,17 +1036,18 @@ func (s *Server) SetAction(ctx context.Context, r *pb.Round) (*pb.Round, error) 
 
 	return round, nil
 }
+
 func (s *Server) CreateDeck(ctx context.Context, r *pb.Round) (*pb.Round, error) {
 	round, err := s.GetRound(ctx, r)
 	if err != nil {
 		return nil, err
 	}
 	d := deck.New()
-	d = deck.Shuffle(d)
+	d = deck.Shuffle(d, r.GetTEST_d())
 
 	round.Deck = d.String()
 	out := &models.Round{}
-	if err := s.gormDb.Where("id = ?", round.GetId()).Find(out).Update(
+	if /*Round*/ err := s.gormDb.Where("id = ?", round.GetId()).Find(out).Update(
 		"deck", round.GetDeck()).Error; err != nil {
 		return nil, err
 	}
@@ -1166,7 +1083,7 @@ func (s *Server) UpdatePlayersCards(ctx context.Context, in *pb.Players) (*pb.Pl
 func (s *Server) UpdateRoundFlop(ctx context.Context, in *pb.Round) (*pb.Round, error) {
 
 	out := &models.Round{}
-	if err := s.gormDb.Where("id = ?", in.GetId()).Find(out).Update(
+	if /*Round*/ err := s.gormDb.Where("id = ?", in.GetId()).Find(out).Update(
 		"Flop", in.GetFlop()).Error; err != nil {
 		return nil, err
 	}
@@ -1177,10 +1094,11 @@ func (s *Server) UpdateRoundFlop(ctx context.Context, in *pb.Round) (*pb.Round, 
 	}
 	return round, nil
 }
+
 func (s *Server) UpdateRoundRiver(ctx context.Context, in *pb.Round) (*pb.Round, error) {
 
 	out := &models.Round{}
-	if err := s.gormDb.Where("id = ?", in.GetId()).Find(out).Update(
+	if /*Round*/ err := s.gormDb.Where("id = ?", in.GetId()).Find(out).Update(
 		"River", in.GetRiver()).Error; err != nil {
 		return nil, err
 	}
@@ -1195,7 +1113,7 @@ func (s *Server) UpdateRoundRiver(ctx context.Context, in *pb.Round) (*pb.Round,
 func (s *Server) UpdateRoundTurn(ctx context.Context, in *pb.Round) (*pb.Round, error) {
 
 	out := &models.Round{}
-	if err := s.gormDb.Where("id = ?", in.GetId()).Find(out).Update(
+	if /*Round*/ err := s.gormDb.Where("id = ?", in.GetId()).Find(out).Update(
 		"Turn", in.GetTurn()).Error; err != nil {
 		return nil, err
 	}
@@ -1206,11 +1124,12 @@ func (s *Server) UpdateRoundTurn(ctx context.Context, in *pb.Round) (*pb.Round, 
 	}
 	return round, nil
 }
+
 func (s *Server) UpdatePlayerNotinHand(ctx context.Context, in *pb.Player) (*pb.Player, error) {
 
 	out := &models.Player{}
 
-	if err := s.gormDb.Where("id = ?", in.GetId()).Find(out).Update(
+	if /*Player*/ err := s.gormDb.Where("id = ?", in.GetId()).Find(out).Update(
 		"InHand", false).Error; err != nil {
 		return nil, err
 	}
@@ -1227,7 +1146,7 @@ func (s *Server) UpdatePlayersChips(ctx context.Context, in *pb.Players) (*pb.Pl
 
 	for _, p := range in.GetPlayers() {
 		out := &models.Player{}
-		if err := s.gormDb.Where("id = ?", p.GetId()).Find(out).Update(
+		if /*Player*/ err := s.gormDb.Where("id = ?", p.GetId()).Find(out).Update(
 			"chips", p.GetChips()).Error; err != nil {
 			return nil, err
 		}
@@ -1324,18 +1243,10 @@ func (s *Server) MakeBet(ctx context.Context, in *pb.Bet) (*pb.Round, error) {
 		return nil, ErrNoBetTypeSet
 	}
 
-	// At this point we have validated
-	//     - the game exists and is in round,
-	//     - the round exists and is in round, and is in the correct status for a bet
-	//     - The player exists and is the correct player on bet for the round
-	//     - Player has sufficient chips, and has not bet this round
-	//     - the bet type and amount of chips bet are valid (greater or equal to highest bet for that betting round/status)
-	// Create bet since its validated
-
 	toCreate := &models.Bet{}
 	toCreate.ProtoUnMarshal(in)
 
-	if err := s.gormDb.Create(toCreate).Error; err != nil {
+	if /*Bet*/ err := s.gormDb.Create(toCreate).Error; err != nil {
 		return nil, err
 	}
 
@@ -1396,9 +1307,9 @@ func (s *Server) SetNextRound(ctx context.Context, in *pb.Round) (*pb.Round, err
 	rMap := map[pb.RoundStatus]pb.RoundStatus{
 		//pb.RoundStatus_NOT_STARTED: pb.RoundStatus_PRE_FLOP,
 		pb.RoundStatus_PRE_FLOP: pb.RoundStatus_FLOP,
-		pb.RoundStatus_FLOP:     pb.RoundStatus_RIVER,
-		pb.RoundStatus_RIVER:    pb.RoundStatus_TURN,
-		pb.RoundStatus_TURN:     pb.RoundStatus_SHOW,
+		pb.RoundStatus_FLOP:     pb.RoundStatus_TURN,
+		pb.RoundStatus_TURN:     pb.RoundStatus_RIVER,
+		pb.RoundStatus_RIVER:    pb.RoundStatus_SHOW,
 		pb.RoundStatus_SHOW:     pb.RoundStatus_OVER,
 	}
 	nextRound := rMap[r.GetStatus()]
@@ -1430,13 +1341,13 @@ func (s *Server) SetNextRound(ctx context.Context, in *pb.Round) (*pb.Round, err
 		if err != nil {
 			return nil, err
 		}
-	case pb.RoundStatus_RIVER:
-		r, err = s.DealRiver(ctx, r)
+	case pb.RoundStatus_TURN:
+		r, err = s.DealTurn(ctx, r)
 		if err != nil {
 			return nil, err
 		}
-	case pb.RoundStatus_TURN:
-		r, err = s.DealTurn(ctx, r)
+	case pb.RoundStatus_RIVER:
+		r, err = s.DealRiver(ctx, r)
 		if err != nil {
 			return nil, err
 		}
@@ -1674,7 +1585,7 @@ func (s *Server) EvaluateHands(ctx context.Context, round *pb.Round) (*pb.Round,
 
 	for _, player := range players.GetPlayers() {
 
-		hand := deck.NewHand(player.GetCards() + round.GetFlop() + round.GetRiver() + round.GetTurn())
+		hand := deck.NewHand(player.GetCards() + round.GetFlop() + round.GetTurn() + round.GetRiver())
 		score := hand.EvaluateHand()
 		// set the score on response
 		player.Score = score
@@ -1706,7 +1617,7 @@ func (s *Server) EvaluateHands(ctx context.Context, round *pb.Round) (*pb.Round,
 	// set winner and set action to 0
 	round.WinningPlayer = winner.GetId()
 	round.WinningScore = winner.GetScore()
-	round.WinningHand = winner.GetCards() + round.GetFlop() + round.GetRiver() + round.GetTurn()
+	round.WinningHand = winner.GetCards() + round.GetFlop() + round.GetTurn() + round.GetRiver()
 	round.Action = 0
 
 	return round, nil
