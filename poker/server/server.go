@@ -968,16 +968,8 @@ func (s *Server) DealTurn(ctx context.Context, r *pb.Round) (*pb.Round, error) {
 
 func (s *Server) DealCards(ctx context.Context, r *pb.Round) (*pb.Round, error) {
 
-	for _, p := range r.GetPlayers().GetPlayers() {
-		if p.GetCards() != "" {
-			return nil, ErrExistingCards
-		}
-	}
 	d := deck.Deck{}
 	d = d.Marshal(r.GetDeck())
-	if !d.IsFull() {
-		return nil, ErrDeckNotFull
-	}
 
 	//burn one
 	_, d = deck.DealCard(d)
