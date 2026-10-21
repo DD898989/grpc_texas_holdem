@@ -8,10 +8,12 @@
     當 遊戲完成座位分配與設定盲注 10 籌碼
     並且 使用作弊機制將牌堆設定為 "2h3h3d3c4h4d4c5h5d5s6h6d6s7h7d7s8h8d8s9h9d9c9sThTdTcTsJhJdJcJsQhQdQcQsKcKsAcAs8c7c6c5c4s3s2s2dAdAhKdKh2c"
     並且 遊戲開始進入第一回合發牌
+
+
     那麼 透過 MySQL 資料庫驗證 "rounds" 表格中的桌面牌面與狀態紀錄應符合：
       | Field          | Value                                                                                            | Note                    |
       | status         | PRE_FLOP                                                                                         | 翻牌前狀態              |
-      | deck           | 2h3h3d3c4h4d4c5h5d5s6h6d6s7h7d7s8h8d8s9h9d9c9sThTdTcTsJhJdJcJsQhQdQcQsKcKsAcAs8c7c6c5c4s3s2s2d       | 扣除手牌與燒牌後剩餘牌堆|
+      | deck           | 2h3h3d3c4h4d4c5h5d5s6h6d6s7h7d7s8h8d8s9h9d9c9sThTdTcTsJhJdJcJsQhQdQcQsKcKsAcAs8c7c6c5c4s3s2s2d   | 扣除手牌與燒牌後剩餘牌堆|
       | flop           |                                                                                                  | 尚未發翻牌              |
       | turn           |                                                                                                  | 尚未發轉牌              |
       | river          |                                                                                                  | 尚未發河牌              |
@@ -21,14 +23,18 @@
       | winning_hand   |                                                                                                  | 尚未結算                |
       | winning_score  | 0                                                                                                | 尚未結算                |
     並且 透過 MySQL 資料庫驗證 "players" 表格中的玩家紀錄應符合：
-      | Player | Cards | Chips | Note           |
-      | Alice  | KhKd  | 990   | Alice 拿老K對子|
-      | Bob    | AhAd  | 980   | Bob 拿A對子    |
+      | Player | Cards | Chips | Note         |
+      | Alice  | KhKd  | 990   | 紅心K, 方塊K |
+      | Bob    | AhAd  | 980   | 紅心A, 方塊A |
     並且 透過 MySQL 資料庫驗證 "bets" 表格中的下注紀錄應符合：
       | Player | Chips | Type  | Status   |
       | Alice  | 10    | SMALL | PRE_FLOP |
       | Bob    | 20    | BIG   | PRE_FLOP |
+
+
     當 當前輪到的玩家進行跟注
+
+
     那麼 透過 MySQL 資料庫驗證 "rounds" 表格中的桌面牌面與狀態紀錄應符合：
       | Field          | Value                                                                            | Note                    |
       | status         | FLOP                                                                             | 跟注後底池打平進入翻牌  |
@@ -40,16 +46,21 @@
       | action         | Bob                                                                              | 輪到 Bob                |
       | winning_player | 0                                                                                | 尚未結算                |
     並且 透過 MySQL 資料庫驗證 "players" 表格中的玩家紀錄應符合：
-      | Player | Cards | Chips | Note         |
-      | Alice  | KhKd  | 980   | 紅心K, 方塊K |
-      | Bob    | AhAd  | 980   | 紅心A, 方塊A |
+      | Player | Cards | Chips |
+      | Alice  | KhKd  | 980   |
+      | Bob    | AhAd  | 980   |
     並且 透過 MySQL 資料庫驗證 "bets" 表格中的下注紀錄應符合：
       | Player | Chips | Type  | Status   |
       | Alice  | 10    | SMALL | PRE_FLOP |
       | Bob    | 20    | BIG   | PRE_FLOP |
       | Alice  | 10    | CALL  | PRE_FLOP |
+
+
+
     當 當前輪到的玩家進行過牌
     並且 另一位玩家也進行過牌
+
+
     那麼 透過 MySQL 資料庫驗證 "rounds" 表格中的桌面牌面與狀態紀錄應符合：
       | Field          | Value                                                                      | Note                    |
       | status         | TURN                                                                       | 雙方過牌自動進入轉牌階段|
@@ -67,8 +78,12 @@
       | Alice  | 10    | CALL  | PRE_FLOP |
       | Bob    | 0     | CALL  | FLOP     |
       | Alice  | 0     | CALL  | FLOP     |
+
+
     當 當前輪到的玩家進行過牌
     並且 另一位玩家也進行過牌
+
+    
     那麼 透過 MySQL 資料庫驗證 "rounds" 表格中的桌面牌面與狀態紀錄應符合：
       | Field          | Value                                                                | Note                    |
       | status         | RIVER                                                                | 雙方過牌自動進入河牌階段|
