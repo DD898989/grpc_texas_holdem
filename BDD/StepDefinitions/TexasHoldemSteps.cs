@@ -167,14 +167,18 @@ namespace TexasHoldem.BDD.StepDefinitions
         [When(@"遊戲開始進入第一回合發牌")]
         public async Task WhenGameStartsFirstRound()
         {
-            _game = await _client.GetGameAsync(new Game { Id = _game!.Id });
-            _round = await _client.CreateRoundFromGameAsync(_game);
+            _game = await _client.GetGameAsync(_game!.Id);
+            _round = await _client.CreateRoundFromGameAsync(_game.Id);
             if (!string.IsNullOrEmpty(_testDeck))
             {
-                _round.TESTD = _testDeck;
+                await _client.CreateDeckAsync(new CreateDeckRequest
+                {
+                    RoundId = _round.Id,
+                    TestD = _testDeck
+                });
             }
-            _round = await _client.StartRoundAsync(_round);
-            _round = await _client.GetRoundAsync(new Round { Id = _round.Id });
+            _round = await _client.StartRoundAsync(_round.Id);
+            _round = await _client.GetRoundAsync(_round.Id);
 
             _round.Should().NotBeNull();
             _round.Id.Should().BeGreaterThan(0);
@@ -186,12 +190,12 @@ namespace TexasHoldem.BDD.StepDefinitions
             _testDeck = cheatDeck;
             if (_round != null && _round.Id > 0)
             {
-                _round = await _client.CreateDeckAsync(new Round
+                _round = await _client.CreateDeckAsync(new CreateDeckRequest
                 {
-                    Id = _round.Id,
-                    TESTD = cheatDeck
+                    RoundId = _round.Id,
+                    TestD = cheatDeck
                 });
-                _round = await _client.GetRoundAsync(new Round { Id = _round.Id });
+                _round = await _client.GetRoundAsync(_round.Id);
             }
             await Task.CompletedTask;
         }
@@ -345,7 +349,7 @@ namespace TexasHoldem.BDD.StepDefinitions
         [When(@"遊戲開始進入第二回合發牌")]
         public async Task WhenGameStartsSecondRound()
         {
-            _game = await _client.GetGameAsync(new Game { Id = _game!.Id });
+            _game = await _client.GetGameAsync(_game!.Id);
             var nextDealer = _game.Dealer == 1 ? 2 : 1;
             using (var connection = new MySqlConnection(_mysqlConnStr))
             {
@@ -353,14 +357,18 @@ namespace TexasHoldem.BDD.StepDefinitions
                 await connection.ExecuteAsync("UPDATE games SET dealer = @Dealer WHERE id = @GameId", new { Dealer = nextDealer, GameId = _game.Id });
                 await connection.ExecuteAsync("UPDATE players SET cards = '', in_hand = 1 WHERE id IN (SELECT player FROM game_players WHERE game = @GameId)", new { GameId = _game.Id });
             }
-            _game = await _client.GetGameAsync(new Game { Id = _game.Id });
-            _round = await _client.CreateRoundFromGameAsync(_game);
+            _game = await _client.GetGameAsync(_game.Id);
+            _round = await _client.CreateRoundFromGameAsync(_game.Id);
             if (!string.IsNullOrEmpty(_testDeck))
             {
-                _round.TESTD = _testDeck;
+                await _client.CreateDeckAsync(new CreateDeckRequest
+                {
+                    RoundId = _round.Id,
+                    TestD = _testDeck
+                });
             }
-            _round = await _client.StartRoundAsync(_round);
-            _round = await _client.GetRoundAsync(new Round { Id = _round.Id });
+            _round = await _client.StartRoundAsync(_round.Id);
+            _round = await _client.GetRoundAsync(_round.Id);
 
             _round.Should().NotBeNull();
             _round.Id.Should().BeGreaterThan(0);

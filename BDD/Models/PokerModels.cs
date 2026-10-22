@@ -88,6 +88,12 @@ namespace TexasHoldem.BDD.Models
         }
     }
 
+    public class CreateDeckRequest
+    {
+        public long RoundId { get; set; }
+        public string TestD { get; set; } = string.Empty;
+    }
+
     public class AmountToCall
     {
         public Player? Player { get; set; }

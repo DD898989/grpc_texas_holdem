@@ -147,16 +147,16 @@ func (s *Server) CreatePlayer(ctx context.Context, p *models.Player) (*models.Pl
 		return nil, err
 	}
 
-	player, err := s.GetPlayer(ctx, toCreate)
+	player, err := s.GetPlayer(ctx, toCreate.GetId())
 	if err != nil {
 		return nil, err
 	}
 	return player, nil
 }
 
-func (s *Server) GetPlayer(ctx context.Context, in *models.Player) (*models.Player, error) {
+func (s *Server) GetPlayer(ctx context.Context, id int64) (*models.Player, error) {
 	p := &models.Player{}
-	if err := s.gormDb.Where("id = ?", in.GetId()).First(&p).Error; err != nil {
+	if err := s.gormDb.Where("id = ?", id).First(&p).Error; err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -186,16 +186,17 @@ func (s *Server) GetPlayersByName(ctx context.Context, players []*models.Player)
 	return outs, nil
 }
 
-func (s *Server) GetGame(ctx context.Context, in *models.Game) (*models.Game, error) {
+func (s *Server) GetGame(ctx context.Context, id int64) (*models.Game, error) {
+	if id <= 0 {
+		return nil, ErrGameDoesntExist
+	}
 	g := &models.Game{}
 
-	if err := s.gormDb.Where("id = ?", in.GetId()).Find(g).Error; err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	} else if err != nil && err == gorm.ErrRecordNotFound {
+	if err := s.gormDb.Where("id = ?", id).First(g).Error; err != nil {
 		return nil, ErrGameDoesntExist
 	}
 
-	playersId, err := s.GetGamePlayersByGameId(ctx, &models.Game{ID: g.ID})
+	playersId, err := s.GetGamePlayersByGameId(ctx, g.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -209,16 +210,17 @@ func (s *Server) GetGame(ctx context.Context, in *models.Game) (*models.Game, er
 	return g, nil
 }
 
-func (s *Server) GetRound(ctx context.Context, in *models.Round) (*models.Round, error) {
+func (s *Server) GetRound(ctx context.Context, id int64) (*models.Round, error) {
+	if id <= 0 {
+		return nil, ErrGameDoesntExist
+	}
 	r := &models.Round{}
 
-	if err := s.gormDb.Where("id = ?", in.GetId()).Find(r).Error; err != nil && err != gorm.ErrRecordNotFound {
-		return nil, err
-	} else if err != nil && err == gorm.ErrRecordNotFound {
+	if err := s.gormDb.Where("id = ?", id).First(r).Error; err != nil {
 		return nil, ErrGameDoesntExist
 	}
 
-	playersId, err := s.GetRoundPlayersByRoundId(ctx, &models.Round{ID: r.ID})
+	playersId, err := s.GetRoundPlayersByRoundId(ctx, r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -232,9 +234,9 @@ func (s *Server) GetRound(ctx context.Context, in *models.Round) (*models.Round,
 	return r, nil
 }
 
-func (s *Server) GetGameByName(ctx context.Context, in *models.Game) (*models.Game, error) {
+func (s *Server) GetGameByName(ctx context.Context, name string) (*models.Game, error) {
 	g := &models.Game{}
-	if err := s.gormDb.Where("name = ?", in.GetName()).Find(&g).Error; err != nil && err != gorm.ErrRecordNotFound {
+	if err := s.gormDb.Where("name = ?", name).Find(&g).Error; err != nil && err != gorm.ErrRecordNotFound {
 		return nil, err
 	} else if err != nil && err == gorm.ErrRecordNotFound {
 		return nil, nil
@@ -242,10 +244,10 @@ func (s *Server) GetGameByName(ctx context.Context, in *models.Game) (*models.Ga
 	return g, nil
 }
 
-func (s *Server) GetGamePlayersByGameId(ctx context.Context, in *models.Game) ([]*models.Player, error) {
+func (s *Server) GetGamePlayersByGameId(ctx context.Context, gameId int64) ([]*models.Player, error) {
 	gp := []*models.GamePlayers{}
 
-	if err := s.gormDb.Where("game = ?", in.GetId()).Find(&gp).Error; err != nil && err != gorm.ErrRecordNotFound {
+	if err := s.gormDb.Where("game = ?", gameId).Find(&gp).Error; err != nil && err != gorm.ErrRecordNotFound {
 		return nil, err
 	} else if err != nil && err == gorm.ErrRecordNotFound {
 		return nil, nil
@@ -266,7 +268,7 @@ func (s *Server) GetGamePlayersByGameId(ctx context.Context, in *models.Game) ([
 }
 
 func (s *Server) SetGamePlayers(ctx context.Context, g *models.Game) ([]*models.Player, error) {
-	existingPlayerRecords, err := s.GetGamePlayersByGameId(ctx, g)
+	existingPlayerRecords, err := s.GetGamePlayersByGameId(ctx, g.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +296,7 @@ func (s *Server) SetGamePlayers(ctx context.Context, g *models.Game) ([]*models.
 			return nil, err
 		}
 	}
-	players, err := s.GetGamePlayersByGameId(ctx, g)
+	players, err := s.GetGamePlayersByGameId(ctx, g.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -310,14 +312,18 @@ func (s *Server) SetPlayerSlot(ctx context.Context, p *models.Player) (*models.P
 		return nil, err
 	}
 
-	player, err := s.GetPlayer(ctx, p)
+	player, err := s.GetPlayer(ctx, p.GetId())
 	if err != nil {
 		return nil, err
 	}
 	return player, nil
 }
 
-func (s *Server) AllocateGameSlots(ctx context.Context, g *models.Game) (*models.Game, error) {
+func (s *Server) AllocateGameSlots(ctx context.Context, gameId int64) (*models.Game, error) {
+	g, err := s.GetGame(ctx, gameId)
+	if err != nil {
+		return nil, err
+	}
 	players := g.GetPlayers()
 	if len(players) < 2 || len(players) > 8 {
 		return nil, ErrInvalidPlayerCount
@@ -334,7 +340,7 @@ func (s *Server) AllocateGameSlots(ctx context.Context, g *models.Game) (*models
 		}
 	}
 
-	out, err := s.GetGame(ctx, g)
+	out, err := s.GetGame(ctx, gameId)
 	if err != nil {
 		return nil, err
 	}
@@ -354,16 +360,16 @@ func (s *Server) CreateGame(ctx context.Context, g *models.Game) (*models.Game, 
 		return nil, err
 	}
 
-	game, err := s.GetGameByName(ctx, g)
+	game, err := s.GetGameByName(ctx, g.GetName())
 	if err != nil {
 		return nil, err
 	}
 	return game, nil
 }
 
-func (s *Server) SetButtonPositions(ctx context.Context, g *models.Game) (*models.Game, error) {
+func (s *Server) SetButtonPositions(ctx context.Context, gameId int64) (*models.Game, error) {
 
-	game, err := s.GetGame(ctx, g)
+	game, err := s.GetGame(ctx, gameId)
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +382,7 @@ func (s *Server) SetButtonPositions(ctx context.Context, g *models.Game) (*model
 		return nil, err
 	}
 
-	out, err := s.GetGame(ctx, g)
+	out, err := s.GetGame(ctx, gameId)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +390,7 @@ func (s *Server) SetButtonPositions(ctx context.Context, g *models.Game) (*model
 }
 
 func (s *Server) SetMin(ctx context.Context, g *models.Game) (*models.Game, error) {
-	game, err := s.GetGame(ctx, g)
+	game, err := s.GetGame(ctx, g.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -393,7 +399,7 @@ func (s *Server) SetMin(ctx context.Context, g *models.Game) (*models.Game, erro
 		return nil, err
 	}
 
-	out, err := s.GetGame(ctx, g)
+	out, err := s.GetGame(ctx, g.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -423,18 +429,18 @@ func getNextInHandPlayerBySlot(players []*models.Player, currentSlot int64) (*mo
 	return nil, game_ring.ErrNoPlayerInHand
 }
 
-func (s *Server) SetNextOnBet(ctx context.Context, in *models.Round) (*models.Round, error) {
-	r, err := s.GetRound(ctx, in)
+func (s *Server) SetNextOnBet(ctx context.Context, roundId int64) (*models.Round, error) {
+	r, err := s.GetRound(ctx, roundId)
 	if err != nil {
 		return nil, err
 	}
 
-	g, err := s.GetGame(ctx, &models.Game{ID: r.GetGame()})
+	g, err := s.GetGame(ctx, r.GetGame())
 	if err != nil {
 		return nil, err
 	}
 
-	nextAction, err := getNextInHandPlayerBySlot(g.GetPlayers(), in.GetAction())
+	nextAction, err := getNextInHandPlayerBySlot(g.GetPlayers(), r.GetAction())
 	if err != nil {
 		return nil, err
 	}
@@ -448,11 +454,11 @@ func (s *Server) SetNextOnBet(ctx context.Context, in *models.Round) (*models.Ro
 	return r, nil
 }
 
-func (s *Server) RemovePlayerFromGame(ctx context.Context, player *models.Player) (*models.Empty, error) {
+func (s *Server) RemovePlayerFromGame(ctx context.Context, playerId int64) (*models.Empty, error) {
 	gp := &models.GamePlayers{}
 	game := &models.Game{}
 
-	if err := s.gormDb.Where("player = ?", player.GetId()).Find(gp).Error; err != nil && err != gorm.ErrRecordNotFound {
+	if err := s.gormDb.Where("player = ?", playerId).Find(gp).Error; err != nil && err != gorm.ErrRecordNotFound {
 		return &models.Empty{}, err
 	} else if err != nil && err == gorm.ErrRecordNotFound {
 		return &models.Empty{}, ErrPlayerDoesntExist
@@ -468,16 +474,16 @@ func (s *Server) RemovePlayerFromGame(ctx context.Context, player *models.Player
 		return &models.Empty{}, ErrGameInRound
 	}
 
-	if err := s.gormDb.Where("player = ?", player.GetId()).Delete(&models.GamePlayers{}).Error; err != nil {
+	if err := s.gormDb.Where("player = ?", playerId).Delete(&models.GamePlayers{}).Error; err != nil {
 		return &models.Empty{}, err
 	}
 	return &models.Empty{}, nil
 }
 
-func (s *Server) GetRoundPlayersByRoundId(ctx context.Context, in *models.Round) ([]*models.Player, error) {
+func (s *Server) GetRoundPlayersByRoundId(ctx context.Context, roundId int64) ([]*models.Player, error) {
 	gp := []*models.RoundPlayers{}
 
-	if err := s.gormDb.Where("round = ?", in.GetId()).Find(&gp).Error; err != nil && err != gorm.ErrRecordNotFound {
+	if err := s.gormDb.Where("round = ?", roundId).Find(&gp).Error; err != nil && err != gorm.ErrRecordNotFound {
 		return nil, err
 	} else if err != nil && err == gorm.ErrRecordNotFound {
 		return nil, nil
@@ -496,8 +502,8 @@ func (s *Server) GetRoundPlayersByRoundId(ctx context.Context, in *models.Round)
 	return players, nil
 }
 
-func (s *Server) UpdateGameInRound(ctx context.Context, g *models.Game) (*models.Game, error) {
-	game, err := s.GetGame(ctx, g)
+func (s *Server) UpdateGameInRound(ctx context.Context, gameId int64) (*models.Game, error) {
+	game, err := s.GetGame(ctx, gameId)
 	if err != nil {
 		return nil, err
 	}
@@ -509,7 +515,7 @@ func (s *Server) UpdateGameInRound(ctx context.Context, g *models.Game) (*models
 		return nil, err
 	}
 
-	out, err := s.GetGame(ctx, g)
+	out, err := s.GetGame(ctx, gameId)
 	if err != nil {
 		return nil, err
 	}
@@ -528,26 +534,26 @@ func (s *Server) UpdateRoundStatus(ctx context.Context, r *models.Round) (*model
 		return nil, err
 	}
 
-	out, err := s.GetRound(ctx, r)
+	out, err := s.GetRound(ctx, r.GetId())
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (s *Server) UpdateGameStatus(ctx context.Context, g *models.Game) (*models.Game, error) {
-	if err := s.gormDb.Model(&models.Game{}).Where("id = ?", g.GetId()).Update("in_round", false).Error; err != nil {
+func (s *Server) UpdateGameStatus(ctx context.Context, gameId int64) (*models.Game, error) {
+	if err := s.gormDb.Model(&models.Game{}).Where("id = ?", gameId).Update("in_round", false).Error; err != nil {
 		return nil, err
 	}
-	out, err := s.GetGame(ctx, g)
+	out, err := s.GetGame(ctx, gameId)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (s *Server) CreateRoundFromGame(ctx context.Context, g *models.Game) (*models.Round, error) {
-	game, err := s.GetGame(ctx, g)
+func (s *Server) CreateRoundFromGame(ctx context.Context, gameId int64) (*models.Round, error) {
+	game, err := s.GetGame(ctx, gameId)
 	if err != nil {
 		return nil, err
 	}
@@ -560,11 +566,11 @@ func (s *Server) CreateRoundFromGame(ctx context.Context, g *models.Game) (*mode
 		return nil, err
 	}
 
-	round, err := s.GetRound(ctx, r)
+	round, err := s.GetRound(ctx, r.GetId())
 	if err != nil {
 		return nil, err
 	}
-	round.Players = g.GetPlayers()
+	round.Players = game.GetPlayers()
 
 	round, err = s.CreateRoundPlayers(ctx, round)
 	if err != nil {
@@ -585,20 +591,27 @@ func (s *Server) CreateRoundPlayers(ctx context.Context, r *models.Round) (*mode
 		}
 	}
 
-	round, err := s.GetRound(ctx, r)
+	round, err := s.GetRound(ctx, r.GetId())
 	if err != nil {
 		return nil, err
 	}
 	return round, nil
 }
 
-func (s *Server) StartRound(ctx context.Context, r *models.Round) (*models.Round, error) {
-	r, err := s.CreateDeck(ctx, r)
+func (s *Server) StartRound(ctx context.Context, roundId int64) (*models.Round, error) {
+	r, err := s.GetRound(ctx, roundId)
 	if err != nil {
 		return nil, err
 	}
 
-	r, err = s.DealCards(ctx, r)
+	if r.GetDeck() == "" {
+		r, err = s.CreateDeck(ctx, &models.CreateDeckRequest{RoundID: roundId})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	r, err = s.DealCards(ctx, roundId)
 	if err != nil {
 		return nil, err
 	}
@@ -609,16 +622,16 @@ func (s *Server) StartRound(ctx context.Context, r *models.Round) (*models.Round
 		return nil, err
 	}
 
-	game, err := s.GetGame(ctx, &models.Game{ID: r.GetGame()})
+	game, err := s.GetGame(ctx, r.GetGame())
 	if err != nil {
 		return nil, err
 	}
-	game, err = s.UpdateGameInRound(ctx, game)
+	game, err = s.UpdateGameInRound(ctx, game.GetId())
 	if err != nil {
 		return nil, err
 	}
 
-	game, err = s.AllocateGameSlots(ctx, game)
+	game, err = s.AllocateGameSlots(ctx, game.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -664,7 +677,7 @@ func (s *Server) StartRound(ctx context.Context, r *models.Round) (*models.Round
 	if _, err := s.MakeBet(ctx, bigBet); err != nil {
 		return nil, err
 	}
-	r, err = s.GetRound(ctx, r)
+	r, err = s.GetRound(ctx, roundId)
 	if err != nil {
 		return nil, err
 	}
@@ -676,7 +689,11 @@ func (s *Server) StartRound(ctx context.Context, r *models.Round) (*models.Round
 	return r, nil
 }
 
-func (s *Server) DealFlop(ctx context.Context, r *models.Round) (*models.Round, error) {
+func (s *Server) DealFlop(ctx context.Context, roundId int64) (*models.Round, error) {
+	r, err := s.GetRound(ctx, roundId)
+	if err != nil {
+		return nil, err
+	}
 	for _, p := range r.GetPlayers() {
 		if p.GetInHand() && p.GetCards() == "" {
 			return nil, ErrNoExistingCards
@@ -691,7 +708,7 @@ func (s *Server) DealFlop(ctx context.Context, r *models.Round) (*models.Round, 
 	c3, d = deck.DealCard(d)
 
 	r.Flop = c1.String() + c2.String() + c3.String()
-	r, err := s.UpdateRoundFlop(ctx, r)
+	r, err = s.UpdateRoundFlop(ctx, r)
 	if err != nil {
 		return nil, err
 	}
@@ -705,15 +722,15 @@ func (s *Server) DealFlop(ctx context.Context, r *models.Round) (*models.Round, 
 	return r, nil
 }
 
-func (s *Server) DealRiver(ctx context.Context, r *models.Round) (*models.Round, error) {
+func (s *Server) DealRiver(ctx context.Context, roundId int64) (*models.Round, error) {
+	r, err := s.GetRound(ctx, roundId)
+	if err != nil {
+		return nil, err
+	}
 	for _, p := range r.GetPlayers() {
 		if p.GetInHand() && p.GetCards() == "" {
 			return nil, ErrNoExistingCards
 		}
-	}
-	r, err := s.GetRound(ctx, r)
-	if err != nil {
-		return nil, err
 	}
 	d := deck.Deck{}.Marshal(r.GetDeck())
 
@@ -735,15 +752,15 @@ func (s *Server) DealRiver(ctx context.Context, r *models.Round) (*models.Round,
 	return r, nil
 }
 
-func (s *Server) DealTurn(ctx context.Context, r *models.Round) (*models.Round, error) {
+func (s *Server) DealTurn(ctx context.Context, roundId int64) (*models.Round, error) {
+	r, err := s.GetRound(ctx, roundId)
+	if err != nil {
+		return nil, err
+	}
 	for _, p := range r.GetPlayers() {
 		if p.GetInHand() && p.GetCards() == "" {
 			return nil, ErrNoExistingCards
 		}
-	}
-	r, err := s.GetRound(ctx, r)
-	if err != nil {
-		return nil, err
 	}
 	d := deck.Deck{}.Marshal(r.GetDeck())
 
@@ -765,7 +782,11 @@ func (s *Server) DealTurn(ctx context.Context, r *models.Round) (*models.Round, 
 	return r, nil
 }
 
-func (s *Server) DealCards(ctx context.Context, r *models.Round) (*models.Round, error) {
+func (s *Server) DealCards(ctx context.Context, roundId int64) (*models.Round, error) {
+	r, err := s.GetRound(ctx, roundId)
+	if err != nil {
+		return nil, err
+	}
 	d := deck.Deck{}
 	d = d.Marshal(r.GetDeck())
 
@@ -777,7 +798,7 @@ func (s *Server) DealCards(ctx context.Context, r *models.Round) (*models.Round,
 		p.Cards = c1.String() + c2.String()
 	}
 
-	_, err := s.UpdatePlayersCards(ctx, r.GetPlayers())
+	_, err = s.UpdatePlayersCards(ctx, r.GetPlayers())
 	if err != nil {
 		return nil, err
 	}
@@ -791,28 +812,28 @@ func (s *Server) UpdateDeck(ctx context.Context, r *models.Round) (*models.Round
 	if err := s.gormDb.Model(&models.Round{}).Where("id = ?", r.GetId()).Update("deck", r.GetDeck()).Error; err != nil {
 		return nil, err
 	}
-	return s.GetRound(ctx, r)
+	return s.GetRound(ctx, r.GetId())
 }
 
 func (s *Server) SetAction(ctx context.Context, r *models.Round) (*models.Round, error) {
 	if err := s.gormDb.Model(&models.Round{}).Where("id = ?", r.GetId()).Update("action", r.GetAction()).Error; err != nil {
 		return nil, err
 	}
-	return s.GetRound(ctx, r)
+	return s.GetRound(ctx, r.GetId())
 }
 
-func (s *Server) CreateDeck(ctx context.Context, r *models.Round) (*models.Round, error) {
-	round, err := s.GetRound(ctx, r)
+func (s *Server) CreateDeck(ctx context.Context, in *models.CreateDeckRequest) (*models.Round, error) {
+	round, err := s.GetRound(ctx, in.GetRoundId())
 	if err != nil {
 		return nil, err
 	}
 	d := deck.New()
-	d = deck.Shuffle(d, r.GetTEST_d())
+	d = deck.Shuffle(d, in.GetTEST_d())
 
 	if err := s.gormDb.Model(&models.Round{}).Where("id = ?", round.GetId()).Update("deck", d.String()).Error; err != nil {
 		return nil, err
 	}
-	return s.GetRound(ctx, r)
+	return s.GetRound(ctx, in.GetRoundId())
 }
 
 func (s *Server) UpdatePlayersCards(ctx context.Context, in []*models.Player) ([]*models.Player, error) {
@@ -831,28 +852,28 @@ func (s *Server) UpdateRoundFlop(ctx context.Context, in *models.Round) (*models
 	if err := s.gormDb.Model(&models.Round{}).Where("id = ?", in.GetId()).Update("flop", in.GetFlop()).Error; err != nil {
 		return nil, err
 	}
-	return s.GetRound(ctx, in)
+	return s.GetRound(ctx, in.GetId())
 }
 
 func (s *Server) UpdateRoundRiver(ctx context.Context, in *models.Round) (*models.Round, error) {
 	if err := s.gormDb.Model(&models.Round{}).Where("id = ?", in.GetId()).Update("river", in.GetRiver()).Error; err != nil {
 		return nil, err
 	}
-	return s.GetRound(ctx, in)
+	return s.GetRound(ctx, in.GetId())
 }
 
 func (s *Server) UpdateRoundTurn(ctx context.Context, in *models.Round) (*models.Round, error) {
 	if err := s.gormDb.Model(&models.Round{}).Where("id = ?", in.GetId()).Update("turn", in.GetTurn()).Error; err != nil {
 		return nil, err
 	}
-	return s.GetRound(ctx, in)
+	return s.GetRound(ctx, in.GetId())
 }
 
-func (s *Server) UpdatePlayerNotinHand(ctx context.Context, in *models.Player) (*models.Player, error) {
-	if err := s.gormDb.Model(&models.Player{}).Where("id = ?", in.GetId()).Update("in_hand", false).Error; err != nil {
+func (s *Server) UpdatePlayerNotinHand(ctx context.Context, playerId int64) (*models.Player, error) {
+	if err := s.gormDb.Model(&models.Player{}).Where("id = ?", playerId).Update("in_hand", false).Error; err != nil {
 		return nil, err
 	}
-	return s.GetPlayer(ctx, in)
+	return s.GetPlayer(ctx, playerId)
 }
 
 func (s *Server) UpdatePlayersChips(ctx context.Context, in []*models.Player) ([]*models.Player, error) {
@@ -865,14 +886,14 @@ func (s *Server) UpdatePlayersChips(ctx context.Context, in []*models.Player) ([
 }
 
 func (s *Server) MakeBet(ctx context.Context, in *models.Bet) (*models.Round, error) {
-	game, err := s.GetGame(ctx, &models.Game{ID: in.GetGame()})
+	game, err := s.GetGame(ctx, in.GetGame())
 	if err != nil {
 		return nil, ErrGameDoesntExist
 	}
 	if !game.GetInRound() {
 		return nil, ErrGameIsNotInRound
 	}
-	r, err := s.GetRound(ctx, &models.Round{ID: in.GetRound()})
+	r, err := s.GetRound(ctx, in.GetRound())
 	if err != nil {
 		return nil, err
 	}
@@ -883,7 +904,7 @@ func (s *Server) MakeBet(ctx context.Context, in *models.Bet) (*models.Round, er
 		return nil, ErrWrongBetStatus
 	}
 
-	player, err := s.GetPlayer(ctx, &models.Player{ID: in.GetPlayer()})
+	player, err := s.GetPlayer(ctx, in.GetPlayer())
 	if err != nil || player == nil {
 		return nil, ErrPlayerDoesntExist
 	}
@@ -906,7 +927,7 @@ func (s *Server) MakeBet(ctx context.Context, in *models.Bet) (*models.Round, er
 
 	switch in.GetType() {
 	case models.Bet_FOLD:
-		player, err = s.UpdatePlayerNotinHand(ctx, &models.Player{ID: player.GetId()})
+		player, err = s.UpdatePlayerNotinHand(ctx, player.GetId())
 		if err != nil {
 			return nil, err
 		}
@@ -946,12 +967,12 @@ func (s *Server) MakeBet(ctx context.Context, in *models.Bet) (*models.Round, er
 		return nil, err
 	}
 
-	r, err = s.GetRound(ctx, r)
+	r, err = s.GetRound(ctx, in.GetRound())
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err := s.SetNextOnBet(ctx, r); err != nil {
+	if _, err := s.SetNextOnBet(ctx, r.GetId()); err != nil {
 		return nil, err
 	}
 
@@ -970,14 +991,14 @@ func (s *Server) MakeBet(ctx context.Context, in *models.Bet) (*models.Round, er
 	}
 
 	if over.GetBettingOver() {
-		return s.SetNextRound(ctx, r)
+		return s.SetNextRound(ctx, r.GetId())
 	}
 
 	return r, nil
 }
 
-func (s *Server) SetNextRound(ctx context.Context, in *models.Round) (*models.Round, error) {
-	r, err := s.GetRound(ctx, &models.Round{ID: in.GetId()})
+func (s *Server) SetNextRound(ctx context.Context, roundId int64) (*models.Round, error) {
+	r, err := s.GetRound(ctx, roundId)
 	if err != nil {
 		return nil, err
 	}
@@ -1006,7 +1027,7 @@ func (s *Server) SetNextRound(ctx context.Context, in *models.Round) (*models.Ro
 	if err != nil {
 		return nil, err
 	}
-	g, err := s.GetGame(ctx, &models.Game{ID: r.GetGame()})
+	g, err := s.GetGame(ctx, r.GetGame())
 	if err != nil {
 		return nil, err
 	}
@@ -1027,22 +1048,22 @@ func (s *Server) SetNextRound(ctx context.Context, in *models.Round) (*models.Ro
 
 	switch nextRound {
 	case models.RoundStatus_FLOP:
-		r, err = s.DealFlop(ctx, r)
+		r, err = s.DealFlop(ctx, r.GetId())
 		if err != nil {
 			return nil, err
 		}
 	case models.RoundStatus_TURN:
-		r, err = s.DealTurn(ctx, r)
+		r, err = s.DealTurn(ctx, r.GetId())
 		if err != nil {
 			return nil, err
 		}
 	case models.RoundStatus_RIVER:
-		r, err = s.DealRiver(ctx, r)
+		r, err = s.DealRiver(ctx, r.GetId())
 		if err != nil {
 			return nil, err
 		}
 	case models.RoundStatus_OVER:
-		r, err = s.EvaluateHands(ctx, r)
+		r, err = s.EvaluateHands(ctx, r.GetId())
 		if err != nil {
 			return nil, err
 		}
@@ -1057,14 +1078,14 @@ func (s *Server) SetNextRound(ctx context.Context, in *models.Round) (*models.Ro
 	}
 
 	if c == 1 {
-		r, err = s.EvaluateHands(ctx, r)
+		r, err = s.EvaluateHands(ctx, r.GetId())
 		if err != nil {
 			return nil, err
 		}
 		return s.UpdateRoundWinner(ctx, r)
 	}
 
-	r, err = s.GetRound(ctx, r)
+	r, err = s.GetRound(ctx, r.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -1083,16 +1104,16 @@ func validateChips(bank, bet, min int64) error {
 	return nil
 }
 
-func (s *Server) GetRoundBets(ctx context.Context, in *models.Round) ([]*models.Bet, error) {
+func (s *Server) GetRoundBets(ctx context.Context, roundId int64) ([]*models.Bet, error) {
 	var bets []*models.Bet
-	if err := s.gormDb.Where("game = ? AND round = ?", in.GetGame(), in.GetId()).Find(&bets).Error; err != nil {
+	if err := s.gormDb.Where("round = ?", roundId).Find(&bets).Error; err != nil {
 		return nil, err
 	}
 	return bets, nil
 }
 
 func (s *Server) GetRoundBetsForStatus(ctx context.Context, in *models.Round) ([]*models.Bet, error) {
-	bets, err := s.GetRoundBets(ctx, in)
+	bets, err := s.GetRoundBets(ctx, in.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -1137,7 +1158,7 @@ func (s *Server) GetAmountToCallForPlayer(ctx context.Context, in *models.Amount
 }
 
 func (s *Server) IsBettingOver(ctx context.Context, in *models.AmountToCall) (*models.AmountToCall, error) {
-	r, err := s.GetRound(ctx, in.GetRound())
+	r, err := s.GetRound(ctx, in.GetRound().GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -1146,12 +1167,12 @@ func (s *Server) IsBettingOver(ctx context.Context, in *models.AmountToCall) (*m
 	if err != nil {
 		return nil, err
 	}
-	g, err := s.GetGame(ctx, &models.Game{ID: r.GetGame()})
+	g, err := s.GetGame(ctx, r.GetGame())
 	if err != nil {
 		return nil, err
 	}
 
-	players, err := s.GetGamePlayersByGameId(ctx, g)
+	players, err := s.GetGamePlayersByGameId(ctx, g.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -1200,8 +1221,13 @@ func (s *Server) IsBettingOver(ctx context.Context, in *models.AmountToCall) (*m
 	return in, nil
 }
 
-func (s *Server) GetPlayerOnBet(ctx context.Context, in *models.Round) (*models.Player, error) {
-	g, err := s.GetGame(ctx, &models.Game{ID: in.GetGame()})
+func (s *Server) GetPlayerOnBet(ctx context.Context, roundId int64) (*models.Player, error) {
+	r, err := s.GetRound(ctx, roundId)
+	if err != nil {
+		return nil, err
+	}
+
+	g, err := s.GetGame(ctx, r.GetGame())
 	if err != nil {
 		return nil, ErrGameDoesntExist
 	}
@@ -1210,7 +1236,7 @@ func (s *Server) GetPlayerOnBet(ctx context.Context, in *models.Round) (*models.
 	if err != nil {
 		return nil, err
 	}
-	p, err := gr.GetPlayerFromSlot(&models.Player{Slot: in.GetAction()})
+	p, err := gr.GetPlayerFromSlot(&models.Player{Slot: r.GetAction()})
 	if err != nil {
 		return nil, err
 	}
@@ -1218,14 +1244,14 @@ func (s *Server) GetPlayerOnBet(ctx context.Context, in *models.Round) (*models.
 }
 
 func (s *Server) UpdateRoundWinner(ctx context.Context, r *models.Round) (*models.Round, error) {
-	g, err := s.GetGame(ctx, &models.Game{ID: r.GetGame()})
+	g, err := s.GetGame(ctx, r.GetGame())
 	if err != nil {
 		return nil, err
 	}
 
 	g.InRound = false
 
-	g, err = s.UpdateGameStatus(ctx, g)
+	g, err = s.UpdateGameStatus(ctx, g.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -1233,7 +1259,11 @@ func (s *Server) UpdateRoundWinner(ctx context.Context, r *models.Round) (*model
 	return s.UpdateRoundStatus(ctx, r)
 }
 
-func (s *Server) EvaluateHands(ctx context.Context, round *models.Round) (*models.Round, error) {
+func (s *Server) EvaluateHands(ctx context.Context, roundId int64) (*models.Round, error) {
+	round, err := s.GetRound(ctx, roundId)
+	if err != nil {
+		return nil, err
+	}
 	players := round.GetPlayers()
 	if len(players) < 1 {
 		return nil, ErrPlayerDoesntExist
@@ -1336,8 +1366,8 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	registerHandler(mux, "CreatePlayer", func(ctx context.Context, in *models.Player) (interface{}, error) {
 		return s.CreatePlayer(ctx, in)
 	})
-	registerHandler(mux, "GetPlayer", func(ctx context.Context, in *models.Player) (interface{}, error) {
-		return s.GetPlayer(ctx, in)
+	registerHandler(mux, "GetPlayer", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.GetPlayer(ctx, in.Int64())
 	})
 	registerHandler(mux, "GetPlayers", func(ctx context.Context, in *[]*models.Player) (interface{}, error) {
 		return s.GetPlayers(ctx, *in)
@@ -1354,71 +1384,71 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	registerHandler(mux, "SetPlayerSlot", func(ctx context.Context, in *models.Player) (interface{}, error) {
 		return s.SetPlayerSlot(ctx, in)
 	})
-	registerHandler(mux, "UpdatePlayerNotinHand", func(ctx context.Context, in *models.Player) (interface{}, error) {
-		return s.UpdatePlayerNotinHand(ctx, in)
+	registerHandler(mux, "UpdatePlayerNotinHand", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.UpdatePlayerNotinHand(ctx, in.Int64())
 	})
-	registerHandler(mux, "RemovePlayerFromGame", func(ctx context.Context, in *models.Player) (interface{}, error) {
-		return s.RemovePlayerFromGame(ctx, in)
+	registerHandler(mux, "RemovePlayerFromGame", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.RemovePlayerFromGame(ctx, in.Int64())
 	})
 
 	// Game RPCs
 	registerHandler(mux, "CreateGame", func(ctx context.Context, in *models.Game) (interface{}, error) {
 		return s.CreateGame(ctx, in)
 	})
-	registerHandler(mux, "GetGameByName", func(ctx context.Context, in *models.Game) (interface{}, error) {
-		return s.GetGameByName(ctx, in)
+	registerHandler(mux, "GetGameByName", func(ctx context.Context, in *models.Name) (interface{}, error) {
+		return s.GetGameByName(ctx, in.String())
 	})
-	registerHandler(mux, "GetGame", func(ctx context.Context, in *models.Game) (interface{}, error) {
-		return s.GetGame(ctx, in)
+	registerHandler(mux, "GetGame", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.GetGame(ctx, in.Int64())
 	})
-	registerHandler(mux, "AllocateGameSlots", func(ctx context.Context, in *models.Game) (interface{}, error) {
-		return s.AllocateGameSlots(ctx, in)
+	registerHandler(mux, "AllocateGameSlots", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.AllocateGameSlots(ctx, in.Int64())
 	})
-	registerHandler(mux, "SetButtonPositions", func(ctx context.Context, in *models.Game) (interface{}, error) {
-		return s.SetButtonPositions(ctx, in)
+	registerHandler(mux, "SetButtonPositions", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.SetButtonPositions(ctx, in.Int64())
 	})
 	registerHandler(mux, "SetMin", func(ctx context.Context, in *models.Game) (interface{}, error) {
 		return s.SetMin(ctx, in)
 	})
-	registerHandler(mux, "UpdateGameInRound", func(ctx context.Context, in *models.Game) (interface{}, error) {
-		return s.UpdateGameInRound(ctx, in)
+	registerHandler(mux, "UpdateGameInRound", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.UpdateGameInRound(ctx, in.Int64())
 	})
-	registerHandler(mux, "UpdateGameStatus", func(ctx context.Context, in *models.Game) (interface{}, error) {
-		return s.UpdateGameStatus(ctx, in)
+	registerHandler(mux, "UpdateGameStatus", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.UpdateGameStatus(ctx, in.Int64())
 	})
-	registerHandler(mux, "GetGamePlayersByGameId", func(ctx context.Context, in *models.Game) (interface{}, error) {
-		return s.GetGamePlayersByGameId(ctx, in)
+	registerHandler(mux, "GetGamePlayersByGameId", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.GetGamePlayersByGameId(ctx, in.Int64())
 	})
 	registerHandler(mux, "SetGamePlayers", func(ctx context.Context, in *models.Game) (interface{}, error) {
 		return s.SetGamePlayers(ctx, in)
 	})
 
 	// Round RPCs
-	registerHandler(mux, "CreateRoundFromGame", func(ctx context.Context, in *models.Game) (interface{}, error) {
-		return s.CreateRoundFromGame(ctx, in)
+	registerHandler(mux, "CreateRoundFromGame", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.CreateRoundFromGame(ctx, in.Int64())
 	})
-	registerHandler(mux, "GetRound", func(ctx context.Context, in *models.Round) (interface{}, error) {
-		return s.GetRound(ctx, in)
+	registerHandler(mux, "GetRound", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.GetRound(ctx, in.Int64())
 	})
-	registerHandler(mux, "StartRound", func(ctx context.Context, in *models.Round) (interface{}, error) {
-		return s.StartRound(ctx, in)
+	registerHandler(mux, "StartRound", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.StartRound(ctx, in.Int64())
 	})
-	registerHandler(mux, "DealCards", func(ctx context.Context, in *models.Round) (interface{}, error) {
-		return s.DealCards(ctx, in)
+	registerHandler(mux, "DealCards", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.DealCards(ctx, in.Int64())
 	})
 	registerHandler(mux, "UpdateDeck", func(ctx context.Context, in *models.Round) (interface{}, error) {
 		return s.UpdateDeck(ctx, in)
 	})
-	registerHandler(mux, "DealFlop", func(ctx context.Context, in *models.Round) (interface{}, error) {
-		return s.DealFlop(ctx, in)
+	registerHandler(mux, "DealFlop", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.DealFlop(ctx, in.Int64())
 	})
-	registerHandler(mux, "DealRiver", func(ctx context.Context, in *models.Round) (interface{}, error) {
-		return s.DealRiver(ctx, in)
+	registerHandler(mux, "DealRiver", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.DealRiver(ctx, in.Int64())
 	})
-	registerHandler(mux, "DealTurn", func(ctx context.Context, in *models.Round) (interface{}, error) {
-		return s.DealTurn(ctx, in)
+	registerHandler(mux, "DealTurn", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.DealTurn(ctx, in.Int64())
 	})
-	registerHandler(mux, "CreateDeck", func(ctx context.Context, in *models.Round) (interface{}, error) {
+	registerHandler(mux, "CreateDeck", func(ctx context.Context, in *models.CreateDeckRequest) (interface{}, error) {
 		return s.CreateDeck(ctx, in)
 	})
 	registerHandler(mux, "SetAction", func(ctx context.Context, in *models.Round) (interface{}, error) {
@@ -1427,11 +1457,11 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	registerHandler(mux, "UpdateRoundStatus", func(ctx context.Context, in *models.Round) (interface{}, error) {
 		return s.UpdateRoundStatus(ctx, in)
 	})
-	registerHandler(mux, "SetNextOnBet", func(ctx context.Context, in *models.Round) (interface{}, error) {
-		return s.SetNextOnBet(ctx, in)
+	registerHandler(mux, "SetNextOnBet", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.SetNextOnBet(ctx, in.Int64())
 	})
-	registerHandler(mux, "SetNextRound", func(ctx context.Context, in *models.Round) (interface{}, error) {
-		return s.SetNextRound(ctx, in)
+	registerHandler(mux, "SetNextRound", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.SetNextRound(ctx, in.Int64())
 	})
 	registerHandler(mux, "UpdateRoundFlop", func(ctx context.Context, in *models.Round) (interface{}, error) {
 		return s.UpdateRoundFlop(ctx, in)
@@ -1442,20 +1472,20 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	registerHandler(mux, "UpdateRoundTurn", func(ctx context.Context, in *models.Round) (interface{}, error) {
 		return s.UpdateRoundTurn(ctx, in)
 	})
-	registerHandler(mux, "GetRoundBets", func(ctx context.Context, in *models.Round) (interface{}, error) {
-		return s.GetRoundBets(ctx, in)
+	registerHandler(mux, "GetRoundBets", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.GetRoundBets(ctx, in.Int64())
 	})
 	registerHandler(mux, "GetRoundBetsForStatus", func(ctx context.Context, in *models.Round) (interface{}, error) {
 		return s.GetRoundBetsForStatus(ctx, in)
 	})
-	registerHandler(mux, "GetPlayerOnBet", func(ctx context.Context, in *models.Round) (interface{}, error) {
-		return s.GetPlayerOnBet(ctx, in)
+	registerHandler(mux, "GetPlayerOnBet", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.GetPlayerOnBet(ctx, in.Int64())
 	})
-	registerHandler(mux, "EvaluateHands", func(ctx context.Context, in *models.Round) (interface{}, error) {
-		return s.EvaluateHands(ctx, in)
+	registerHandler(mux, "EvaluateHands", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.EvaluateHands(ctx, in.Int64())
 	})
-	registerHandler(mux, "GetRoundPlayersByRoundId", func(ctx context.Context, in *models.Round) (interface{}, error) {
-		return s.GetRoundPlayersByRoundId(ctx, in)
+	registerHandler(mux, "GetRoundPlayersByRoundId", func(ctx context.Context, in *models.ID) (interface{}, error) {
+		return s.GetRoundPlayersByRoundId(ctx, in.Int64())
 	})
 	registerHandler(mux, "CreateRoundPlayers", func(ctx context.Context, in *models.Round) (interface{}, error) {
 		return s.CreateRoundPlayers(ctx, in)
