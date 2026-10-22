@@ -18,6 +18,7 @@
     並且 雙方玩家進行攤牌結算派彩
     那麼 透過 MySQL 資料庫驗證 "rounds" 表格中的桌面牌面與狀態紀錄應符合：
       | Field          | Value    | Note                            |
+      | id             | 1        |                                |
       | status         | OVER     | 第一回合順利結束                |
       | winning_player | Alice    | 第一回合 Alice 獲勝             |
       | winning_score  | 831      | 同花計分 831                    |
@@ -32,6 +33,7 @@
       | dealer | 2     | 莊家按鈕輪替至第 2 號位 Bob |
     並且 透過 MySQL 資料庫驗證 "rounds" 表格中的桌面牌面與狀態紀錄應符合：
       | Field          | Value    | Note                          |
+      | id             | 2        |                                |
       | status         | PRE_FLOP | 第二回合進入翻牌前狀態        |
       | game           | <GameId> | 當前遊戲 ID                   |
       | action         | Bob      | 第二回合輪到小盲位 Bob 先行行動|
