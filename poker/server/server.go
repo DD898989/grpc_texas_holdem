@@ -143,7 +143,7 @@ func (s *Server) CreatePlayer(ctx context.Context, p *models.Player) (*models.Pl
 		InHand: p.GetInHand(),
 	}
 
-	if err := s.gormDb.Create(toCreate).Error; err != nil {
+	if err := /*Player*/ s.gormDb.Create(toCreate).Error; err != nil {
 		return nil, err
 	}
 
@@ -292,7 +292,7 @@ func (s *Server) SetGamePlayers(ctx context.Context, g *models.Game) ([]*models.
 
 	for _, shouldAdd := range playersToJoinMap {
 		toCreate := &models.GamePlayers{Player: shouldAdd.GetId(), Game: g.GetId()}
-		if err := s.gormDb.Create(toCreate).Error; err != nil {
+		if err := /*GamePlayers*/ s.gormDb.Create(toCreate).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -308,7 +308,7 @@ func (s *Server) SetPlayerSlot(ctx context.Context, p *models.Player) (*models.P
 		return nil, ErrInvalidSlotMinMax
 	}
 
-	if err := s.gormDb.Model(&models.Player{}).Where("id = ?", p.GetId()).Update("slot", p.GetSlot()).Error; err != nil {
+	if err := /*Player*/ s.gormDb.Model(&models.Player{}).Where("id = ?", p.GetId()).Update("slot", p.GetSlot()).Error; err != nil {
 		return nil, err
 	}
 
@@ -356,7 +356,7 @@ func (s *Server) CreateGame(ctx context.Context, g *models.Game) (*models.Game, 
 		Min:     g.GetMin(),
 		InRound: g.GetInRound(),
 	}
-	if err := s.gormDb.Create(toCreate).Error; err != nil {
+	if err := /*Game*/ s.gormDb.Create(toCreate).Error; err != nil {
 		return nil, err
 	}
 
@@ -378,7 +378,7 @@ func (s *Server) SetButtonPositions(ctx context.Context, gameId int64) (*models.
 		"dealer": int64(rand.Intn(len(game.GetPlayers()))) + 1,
 	}
 
-	if err := s.gormDb.Model(&models.Game{}).Where("id = ?", game.GetId()).Updates(toUpdate).Error; err != nil {
+	if err := /*Game*/ s.gormDb.Model(&models.Game{}).Where("id = ?", game.GetId()).Updates(toUpdate).Error; err != nil {
 		return nil, err
 	}
 
@@ -395,7 +395,7 @@ func (s *Server) SetMin(ctx context.Context, g *models.Game) (*models.Game, erro
 		return nil, err
 	}
 
-	if err := s.gormDb.Model(&models.Game{}).Where("id = ?", game.GetId()).Update("min", g.GetMin()).Error; err != nil {
+	if err := /*Game*/ s.gormDb.Model(&models.Game{}).Where("id = ?", game.GetId()).Update("min", g.GetMin()).Error; err != nil {
 		return nil, err
 	}
 
@@ -511,7 +511,7 @@ func (s *Server) UpdateGameInRound(ctx context.Context, gameId int64) (*models.G
 		return nil, ErrGameDoesntExist
 	}
 
-	if err := s.gormDb.Model(&models.Game{}).Where("id = ?", game.GetId()).Update("in_round", true).Error; err != nil {
+	if err := /*Game*/ s.gormDb.Model(&models.Game{}).Where("id = ?", game.GetId()).Update("in_round", true).Error; err != nil {
 		return nil, err
 	}
 
@@ -530,7 +530,7 @@ func (s *Server) UpdateRoundStatus(ctx context.Context, r *models.Round) (*model
 		"winning_hand":   r.GetWinningHand(),
 		"winning_score":  r.GetWinningScore(),
 	}
-	if err := s.gormDb.Model(&models.Round{}).Where("id = ?", r.GetId()).Updates(updates).Error; err != nil {
+	if err := /*Round*/ s.gormDb.Model(&models.Round{}).Where("id = ?", r.GetId()).Updates(updates).Error; err != nil {
 		return nil, err
 	}
 
@@ -542,7 +542,7 @@ func (s *Server) UpdateRoundStatus(ctx context.Context, r *models.Round) (*model
 }
 
 func (s *Server) UpdateGameStatus(ctx context.Context, gameId int64) (*models.Game, error) {
-	if err := s.gormDb.Model(&models.Game{}).Where("id = ?", gameId).Update("in_round", false).Error; err != nil {
+	if err := /*Game*/ s.gormDb.Model(&models.Game{}).Where("id = ?", gameId).Update("in_round", false).Error; err != nil {
 		return nil, err
 	}
 	out, err := s.GetGame(ctx, gameId)
@@ -562,7 +562,7 @@ func (s *Server) CreateRoundFromGame(ctx context.Context, gameId int64) (*models
 	}
 
 	r := game.MarshalRound()
-	if err := s.gormDb.Create(r).Error; err != nil {
+	if err := /*Round*/ s.gormDb.Create(r).Error; err != nil {
 		return nil, err
 	}
 
@@ -586,7 +586,7 @@ func (s *Server) CreateRoundPlayers(ctx context.Context, r *models.Round) (*mode
 
 	for _, shouldAdd := range r.GetPlayers() {
 		toCreate := &models.RoundPlayers{Player: shouldAdd.GetId(), Game: r.GetGame(), Round: r.GetId()}
-		if err := s.gormDb.Create(toCreate).Error; err != nil {
+		if err := /*RoundPlayers*/ s.gormDb.Create(toCreate).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -809,14 +809,14 @@ func (s *Server) DealCards(ctx context.Context, roundId int64) (*models.Round, e
 }
 
 func (s *Server) UpdateDeck(ctx context.Context, r *models.Round) (*models.Round, error) {
-	if err := s.gormDb.Model(&models.Round{}).Where("id = ?", r.GetId()).Update("deck", r.GetDeck()).Error; err != nil {
+	if err := /*Round*/ s.gormDb.Model(&models.Round{}).Where("id = ?", r.GetId()).Update("deck", r.GetDeck()).Error; err != nil {
 		return nil, err
 	}
 	return s.GetRound(ctx, r.GetId())
 }
 
 func (s *Server) SetAction(ctx context.Context, r *models.Round) (*models.Round, error) {
-	if err := s.gormDb.Model(&models.Round{}).Where("id = ?", r.GetId()).Update("action", r.GetAction()).Error; err != nil {
+	if err := /*Round*/ s.gormDb.Model(&models.Round{}).Where("id = ?", r.GetId()).Update("action", r.GetAction()).Error; err != nil {
 		return nil, err
 	}
 	return s.GetRound(ctx, r.GetId())
@@ -830,7 +830,7 @@ func (s *Server) CreateDeck(ctx context.Context, in *models.CreateDeckRequest) (
 	d := deck.New()
 	d = deck.Shuffle(d, in.GetTEST_d())
 
-	if err := s.gormDb.Model(&models.Round{}).Where("id = ?", round.GetId()).Update("deck", d.String()).Error; err != nil {
+	if err := /*Round*/ s.gormDb.Model(&models.Round{}).Where("id = ?", round.GetId()).Update("deck", d.String()).Error; err != nil {
 		return nil, err
 	}
 	return s.GetRound(ctx, in.GetRoundId())
@@ -838,7 +838,7 @@ func (s *Server) CreateDeck(ctx context.Context, in *models.CreateDeckRequest) (
 
 func (s *Server) UpdatePlayersCards(ctx context.Context, in []*models.Player) ([]*models.Player, error) {
 	for _, p := range in {
-		if err := s.gormDb.Model(&models.Player{}).Where("id = ?", p.GetId()).Updates(map[string]interface{}{
+		if err := /*Player*/ s.gormDb.Model(&models.Player{}).Where("id = ?", p.GetId()).Updates(map[string]interface{}{
 			"cards":   p.GetCards(),
 			"in_hand": true,
 		}).Error; err != nil {
@@ -849,28 +849,28 @@ func (s *Server) UpdatePlayersCards(ctx context.Context, in []*models.Player) ([
 }
 
 func (s *Server) UpdateRoundFlop(ctx context.Context, in *models.Round) (*models.Round, error) {
-	if err := s.gormDb.Model(&models.Round{}).Where("id = ?", in.GetId()).Update("flop", in.GetFlop()).Error; err != nil {
+	if err := /*Round*/ s.gormDb.Model(&models.Round{}).Where("id = ?", in.GetId()).Update("flop", in.GetFlop()).Error; err != nil {
 		return nil, err
 	}
 	return s.GetRound(ctx, in.GetId())
 }
 
 func (s *Server) UpdateRoundRiver(ctx context.Context, in *models.Round) (*models.Round, error) {
-	if err := s.gormDb.Model(&models.Round{}).Where("id = ?", in.GetId()).Update("river", in.GetRiver()).Error; err != nil {
+	if err := /*Round*/ s.gormDb.Model(&models.Round{}).Where("id = ?", in.GetId()).Update("river", in.GetRiver()).Error; err != nil {
 		return nil, err
 	}
 	return s.GetRound(ctx, in.GetId())
 }
 
 func (s *Server) UpdateRoundTurn(ctx context.Context, in *models.Round) (*models.Round, error) {
-	if err := s.gormDb.Model(&models.Round{}).Where("id = ?", in.GetId()).Update("turn", in.GetTurn()).Error; err != nil {
+	if err := /*Round*/ s.gormDb.Model(&models.Round{}).Where("id = ?", in.GetId()).Update("turn", in.GetTurn()).Error; err != nil {
 		return nil, err
 	}
 	return s.GetRound(ctx, in.GetId())
 }
 
 func (s *Server) UpdatePlayerNotinHand(ctx context.Context, playerId int64) (*models.Player, error) {
-	if err := s.gormDb.Model(&models.Player{}).Where("id = ?", playerId).Update("in_hand", false).Error; err != nil {
+	if err := /*Player*/ s.gormDb.Model(&models.Player{}).Where("id = ?", playerId).Update("in_hand", false).Error; err != nil {
 		return nil, err
 	}
 	return s.GetPlayer(ctx, playerId)
@@ -878,7 +878,7 @@ func (s *Server) UpdatePlayerNotinHand(ctx context.Context, playerId int64) (*mo
 
 func (s *Server) UpdatePlayersChips(ctx context.Context, in []*models.Player) ([]*models.Player, error) {
 	for _, p := range in {
-		if err := s.gormDb.Model(&models.Player{}).Where("id = ?", p.GetId()).Update("chips", p.GetChips()).Error; err != nil {
+		if err := /*Player*/ s.gormDb.Model(&models.Player{}).Where("id = ?", p.GetId()).Update("chips", p.GetChips()).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -963,7 +963,7 @@ func (s *Server) MakeBet(ctx context.Context, in *models.Bet) (*models.Round, er
 		Type:   in.GetType(),
 	}
 
-	if err := s.gormDb.Create(toCreate).Error; err != nil {
+	if err := /*Bet*/ s.gormDb.Create(toCreate).Error; err != nil {
 		return nil, err
 	}
 
